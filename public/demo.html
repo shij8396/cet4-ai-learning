@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CET4 AI 英语学习系统 — 演示</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #0f172a;
+        color: #e2e8f0;
+        font-family: system-ui, sans-serif;
+        padding: 24px;
+      }
+      .container {
+        max-width: 480px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 24px;
+        font-weight: 700;
+        text-align: center;
+        margin-bottom: 8px;
+        color: #f8fafc;
+      }
+      .subtitle {
+        text-align: center;
+        color: #94a3b8;
+        margin-bottom: 32px;
+        font-size: 14px;
+      }
+      .section {
+        margin-bottom: 40px;
+      }
+      .section-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+      .section-num {
+        background: #3b82f6;
+        color: #fff;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .section h2 {
+        font-size: 18px;
+        font-weight: 600;
+        color: #f1f5f9;
+      }
+      .section p {
+        color: #94a3b8;
+        font-size: 13px;
+        margin-top: 2px;
+      }
+      .screenshot {
+        width: 100%;
+        border-radius: 16px;
+        border: 2px solid #1e293b;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+      }
+      .footer {
+        text-align: center;
+        color: #475569;
+        font-size: 12px;
+        margin-top: 40px;
+        padding: 20px 0;
+      }
+      .badge {
+        display: inline-block;
+        background: #1e293b;
+        color: #3b82f6;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 12px;
+        margin-top: 16px;
+      }
+      .tech-stack {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 16px;
+      }
+      .tech-stack span {
+        background: #1e293b;
+        color: #94a3b8;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🏥 CET4 AI 英语学习系统</h1>
+      <p class="subtitle">基于词汇约束的 AI 英语学习系统 — 自动演示</p>
+      <div class="tech-stack">
+        <span>Next.js 14</span><span>TypeScript</span><span>Prisma</span><span>NextAuth</span
+        ><span>Gemini AI</span><span>Tailwind CSS</span>
+      </div>
+      <div class="badge">📱 移动端截图 @ 390×844</div>
+
+      <div style="margin-top: 40px"></div>
+
+      <div class="section">
+        <div class="section-title">
+          <div class="section-num">1</div>
+          <div>
+            <h2>登录页面</h2>
+            <p>NextAuth 安全认证 · zod 表单校验</p>
+          </div>
+        </div>
+        <img class="screenshot" src="/demo-screenshots/01-login-page.png" alt="Login" />
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <div class="section-num">2</div>
+          <div>
+            <h2>填写登录信息</h2>
+            <p>自动填充测试账号</p>
+          </div>
+        </div>
+        <img class="screenshot" src="/demo-screenshots/02-login-filled.png" alt="Login Filled" />
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <div class="section-num">3</div>
+          <div>
+            <h2>首页</h2>
+            <p>登录成功 — 学习仪表盘</p>
+          </div>
+        </div>
+        <img class="screenshot" src="/demo-screenshots/03-home-after-login.png" alt="Home" />
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <div class="section-num">4</div>
+          <div>
+            <h2>阅读训练</h2>
+            <p>AI 生成分级阅读 · 单词高亮翻译</p>
+          </div>
+        </div>
+        <img class="screenshot" src="/demo-screenshots/04-reading.png" alt="Reading" />
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <div class="section-num">5</div>
+          <div>
+            <h2>单词默写</h2>
+            <p>中→英 / 听力→拼写 / 例句填空 / 错词强化</p>
+          </div>
+        </div>
+        <img class="screenshot" src="/demo-screenshots/05-dictation.png" alt="Dictation" />
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <div class="section-num">6</div>
+          <div>
+            <h2>作文助手</h2>
+            <p>实时拼写检测 · 超纲词标记 · AI 表达助手</p>
+          </div>
+        </div>
+        <img class="screenshot" src="/demo-screenshots/06-writing.png" alt="Writing" />
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <div class="section-num">7</div>
+          <div>
+            <h2>四级词库</h2>
+            <p>收藏 · 错词本 · 发音 · 进度追踪</p>
+          </div>
+        </div>
+        <img class="screenshot" src="/demo-screenshots/07-words.png" alt="Words" />
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <div class="section-num">8</div>
+          <div>
+            <h2>系统设置</h2>
+            <p>AI 功能开关 · 学习提醒 · 数据管理</p>
+          </div>
+        </div>
+        <img class="screenshot" src="/demo-screenshots/08-settings.png" alt="Settings" />
+      </div>
+
+      <div class="footer">
+        <p>Powered by Next.js + Prisma + TypeScript + Gemini AI</p>
+        <p style="margin-top: 4px">Project Doctor ✅ | E2E Tests 97% ✅ | Mobile Ready ✅</p>
+      </div>
+    </div>
+  </body>
+</html>

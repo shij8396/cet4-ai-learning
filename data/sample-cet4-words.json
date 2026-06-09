@@ -1,0 +1,32 @@
+[
+  {
+    "word": "abandon",
+    "phonetic": "/əˈbændən/",
+    "meaning": "v. 放弃；抛弃",
+    "partOfSpeech": "verb",
+    "frequency": 3,
+    "example": "He abandoned his plan to study abroad.",
+    "exampleCn": "他放弃了出国留学的计划。",
+    "tags": ["高频"]
+  },
+  {
+    "word": "ability",
+    "phonetic": "/əˈbɪləti/",
+    "meaning": "n. 能力；才能",
+    "partOfSpeech": "noun",
+    "frequency": 5,
+    "example": "She has the ability to learn quickly.",
+    "exampleCn": "她有快速学习的能力。",
+    "tags": ["高频"]
+  },
+  {
+    "word": "achieve",
+    "phonetic": "/əˈtʃiːv/",
+    "meaning": "v. 达到；实现",
+    "partOfSpeech": "verb",
+    "frequency": 5,
+    "example": "He achieved his goal.",
+    "exampleCn": "他实现了他的目标。",
+    "tags": ["高频"]
+  }
+]

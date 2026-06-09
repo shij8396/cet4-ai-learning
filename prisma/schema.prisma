@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts        Account[]
+  sessions        Session[]
+  wordProgress    UserWordProgress[]
+  reviewRecords   WordReviewRecord[]
+  writingRecords     WritingRecord[]
+  dictationRecords DictationRecord[]
+  dictationSessions DictationSession[]
+  dailyStats      DailyStat[]
+  readingProgress  UserReadingProgress[]
+  checkIns        CheckIn[]
+  achievements    UserAchievement[]
+  reminders       StudyReminder[]
+
+  level         Int       @default(1)
+  totalWords    Int       @default(0)
+  masteredWords Int       @default(0)
+  streak        Int       @default(0)
+  lastStudyDate DateTime?
+  xp            Int       @default(0)
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Word {
+  id          String   @id @default(cuid())
+  word        String   @unique
+  phonetic    String?
+  meaning     String
+  partOfSpeech String?
+  level       String   @default("cet4")
+  frequency   Int      @default(0)
+  example     String?
+  exampleCn   String?
+  tags        String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  progress      UserWordProgress[]
+  reviewRecords WordReviewRecord[]
+
+  @@index([level])
+  @@index([frequency])
+}
+
+model UserWordProgress {
+  id             String   @id @default(cuid())
+  userId         String
+  wordId         String
+  masteryLevel   Int      @default(0)
+  reviewCount    Int      @default(0)
+  wrongCount     Int      @default(0)
+  lastReviewTime DateTime?
+  nextReviewTime DateTime?
+  isFavorite     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, wordId])
+  @@index([userId, masteryLevel])
+  @@index([userId, nextReviewTime])
+}
+
+model WordReviewRecord {
+  id         String   @id @default(cuid())
+  userId     String
+  wordId     String
+  result     String
+  reviewType String   @default("recognition")
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  word Word @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, wordId, createdAt])
+}
+
+model ReadingArticle {
+  id                   String   @id @default(cuid())
+  title                String
+  content              String
+  translatedContent    String?
+  simplifiedContent    String?
+  level                Int      @default(1)
+  difficultyScore      Float    @default(0)
+  vocabularyCoverage   Float    @default(1)
+  wordCount            Int      @default(0)
+  estimatedReadingTime Int      @default(0)
+  sourceUrl            String?
+  tags                 String   @default("[]")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  userProgress UserReadingProgress[]
+
+  @@index([level])
+  @@index([difficultyScore])
+}
+
+model UserReadingProgress {
+  id           String   @id @default(cuid())
+  userId       String
+  articleId    String
+  progress     Float    @default(0)
+  readTime     Int      @default(0)
+  clickedWords String   @default("[]")
+  unknownWords String   @default("[]")
+  isCompleted  Boolean  @default(false)
+  lastReadAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  article ReadingArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, articleId])
+  @@index([userId, isCompleted])
+}
+
+model WritingRecord {
+  id                String   @id @default(cuid())
+  userId            String
+  title             String?
+  content           String
+  correctedContent  String?
+  score             Float?
+  grammarErrors     Json?
+  spellingErrors    Json?
+  outOfLevelWords   String   @default("[]")
+  vocabularyCoverage Float?
+  writingTime       Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  suggestions WritingSuggestion[]
+
+  @@index([userId, createdAt])
+}
+
+model WritingSuggestion {
+  id               String   @id @default(cuid())
+  writingRecordId  String
+  type             String
+  originalText     String
+  suggestedText    String
+  explanation      String?
+  createdAt        DateTime @default(now())
+
+  writingRecord WritingRecord @relation(fields: [writingRecordId], references: [id], onDelete: Cascade)
+
+  @@index([writingRecordId])
+}
+
+model DictationSession {
+  id           String   @id @default(cuid())
+  userId       String
+  type         String   @default("cn_to_en")
+  totalWords   Int      @default(0)
+  correctCount Int      @default(0)
+  wrongCount   Int      @default(0)
+  duration     Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  records DictationRecord[]
+
+  @@index([userId, createdAt])
+}
+
+model DictationRecord {
+  id            String   @id @default(cuid())
+  sessionId     String
+  userId        String
+  wordId        String?
+  word          String   @default("")
+  prompt        String
+  userAnswer    String?
+  correctAnswer String
+  isCorrect     Boolean
+  type          String   @default("cn_to_en")
+  errorType     String?
+  timeSpent     Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  user    User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session DictationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([userId, createdAt])
+  @@index([userId, isCorrect])
+}
+
+model DailyStat {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime
+  wordsLearned  Int      @default(0)
+  wordsReviewed Int      @default(0)
+  articlesRead  Int      @default(0)
+  dictations    Int      @default(0)
+  writingCount  Int      @default(0)
+  studyMinutes  Int      @default(0)
+  xpGained      Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model CheckIn {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime
+  streak    Int      @default(0)
+  xpBonus   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, createdAt])
+}
+
+model Achievement {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  name            String
+  description     String
+  icon            String   @default("trophy")
+  category        String   @default("general")
+  requirement     Int      @default(0)
+  xpReward        Int      @default(0)
+  createdAt       DateTime @default(now())
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementKey String
+  progress      Int      @default(0)
+  isUnlocked    Boolean  @default(false)
+  unlockedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementKey])
+  @@index([userId, isUnlocked])
+}
+
+model StudyReminder {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   @default("daily")
+  time      String   @default("09:00")
+  enabled   Boolean  @default(true)
+  daysOfWeek String   @default("[\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"0\"]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
