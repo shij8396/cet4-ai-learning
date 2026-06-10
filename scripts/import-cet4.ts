@@ -1,17 +1,14 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 import { PrismaClient } from "../src/generated/prisma/client";
 import { stringifyJsonArray } from "../src/lib/json-array";
 
 import "dotenv/config";
 
-const adapter = new PrismaBetterSqlite3({
-  url: process.env.DATABASE_URL!,
-});
-
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
 interface WordRow {
@@ -27,22 +24,23 @@ interface WordRow {
 
 function readJsonFile(filePath: string): WordRow[] {
   const raw = fs.readFileSync(filePath, "utf-8");
-  return JSON.parse(raw);
+  return JSON.parse(raw) as WordRow[];
 }
 
 function readCsvFile(filePath: string): WordRow[] {
   const raw = fs.readFileSync(filePath, "utf-8");
-  const lines = raw.split("\n").filter((l) => l.trim());
+  const lines = raw.split("\n").filter((line) => line.trim());
   if (lines.length < 2) return [];
 
-  const headers = lines[0].split(",").map((h) => h.trim());
+  const headers = lines[0].split(",").map((header) => header.trim());
   const rows: WordRow[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(",").map((v) => v.trim());
+    const values = lines[i].split(",").map((value) => value.trim());
     const row: Record<string, string> = {};
-    headers.forEach((h, idx) => {
-      row[h] = values[idx] || "";
+
+    headers.forEach((header, index) => {
+      row[header] = values[index] || "";
     });
 
     rows.push({
@@ -50,7 +48,7 @@ function readCsvFile(filePath: string): WordRow[] {
       phonetic: row.phonetic || undefined,
       meaning: row.meaning || row.definition || "",
       partOfSpeech: row.partOfSpeech || row.pos || undefined,
-      frequency: row.frequency ? parseInt(row.frequency) : 1,
+      frequency: row.frequency ? Number.parseInt(row.frequency, 10) : 1,
       example: row.example || undefined,
       exampleCn: row.exampleCn || row.example_cn || undefined,
       tags: row.tags ? row.tags.split(";") : [],
@@ -62,12 +60,15 @@ function readCsvFile(filePath: string): WordRow[] {
 
 function validateWord(row: WordRow): string[] {
   const errors: string[] = [];
+
   if (!row.word || !/^[a-zA-Z]+(-[a-zA-Z]+)*$/.test(row.word)) {
     errors.push(`无效单词: "${row.word}"`);
   }
+
   if (!row.meaning || row.meaning.length < 2) {
     errors.push(`释义过短: "${row.meaning}"`);
   }
+
   return errors;
 }
 
@@ -81,8 +82,9 @@ async function importWords(
 
   for (const row of words) {
     const validationErrors = validateWord(row);
+
     if (validationErrors.length > 0) {
-      console.warn(`  ⚠ 跳过 "${row.word}": ${validationErrors.join(", ")}`);
+      console.warn(`  跳过 "${row.word}": ${validationErrors.join(", ")}`);
       errors++;
       continue;
     }
@@ -132,19 +134,19 @@ async function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.log("用法: npx ts-node scripts/import-cet4.ts <file.json|file.csv>");
-    console.log("示例: npx ts-node scripts/import-cet4.ts data/cet4-words.json");
+    console.log("用法: npx tsx scripts/import-cet4.ts <file.json|file.csv>");
+    console.log("示例: npx tsx scripts/import-cet4.ts data/cet4-words.json");
     process.exit(0);
   }
 
   const filePath = path.resolve(args[0]);
 
   if (!fs.existsSync(filePath)) {
-    console.error(`❌ 文件不存在: ${filePath}`);
+    console.error(`文件不存在: ${filePath}`);
     process.exit(1);
   }
 
-  console.log(`📂 读取文件: ${filePath}`);
+  console.log(`读取文件: ${filePath}`);
 
   const ext = path.extname(filePath).toLowerCase();
   let words: WordRow[];
@@ -155,25 +157,29 @@ async function main() {
     } else if (ext === ".csv") {
       words = readCsvFile(filePath);
     } else {
-      console.error("❌ 不支持的文件格式，请使用 .json 或 .csv");
+      console.error("不支持的文件格式，请使用 .json 或 .csv");
       process.exit(1);
     }
   } catch (err) {
-    console.error("❌ 文件解析失败:", err);
+    console.error("文件解析失败:", err);
     process.exit(1);
   }
 
-  console.log(`📊 读取到 ${words.length} 条单词记录`);
+  console.log(`读取到 ${words.length} 条单词记录`);
 
   const uniqueWords = words.filter(
-    (w, i, arr) => arr.findIndex((x) => x.word.toLowerCase() === w.word.toLowerCase()) === i,
+    (word, index, allWords) =>
+      allWords.findIndex(
+        (candidate) => candidate.word.toLowerCase() === word.word.toLowerCase(),
+      ) === index,
   );
-  console.log(`🔍 去重后: ${uniqueWords.length} 条`);
+
+  console.log(`去重后 ${uniqueWords.length} 条`);
 
   const result = await importWords(uniqueWords);
   console.log(`Updated existing words: ${result.updated}`);
 
-  console.log("\n✅ 导入完成:");
+  console.log("\n导入完成:");
   console.log(`   成功导入: ${result.imported} 个`);
   console.log(`   已存在跳过: ${result.skipped} 个`);
   console.log(`   数据错误: ${result.errors} 个`);
@@ -181,8 +187,8 @@ async function main() {
   await prisma.$disconnect();
 }
 
-main().catch(async (e) => {
-  console.error("❌ 导入失败:", e);
+main().catch(async (error) => {
+  console.error("导入失败:", error);
   await prisma.$disconnect();
   process.exit(1);
 });

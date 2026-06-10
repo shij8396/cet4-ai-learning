@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { auth } from "@/lib/auth";
+import { apiError, enforceRateLimit, requireApiAuth, UnauthorizedError } from "@/lib/api-helpers";
 import { parseJsonArray, stringifyJsonArray } from "@/lib/json-array";
 import { prisma } from "@/lib/prisma";
 import { validateWriting, getCacheStatus } from "@/lib/vocabulary-validator";
 import { loadWordCache } from "@/lib/vocabulary-validator/vocabulary-cache";
 
 const saveWritingSchema = z.object({
-  title: z.string().optional(),
+  title: z.string().max(120).optional(),
   content: z.string().min(1, "内容不能为空").max(10000, "文本过长"),
   score: z.number().min(0).max(100).optional(),
   grammarErrors: z.unknown().optional(),
@@ -26,22 +26,18 @@ const validateSchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "请先登录" }, { status: 401 });
-    }
-
+    const userId = await requireApiAuth();
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
     if (id) {
-      const record = await prisma.writingRecord.findUnique({
-        where: { id, userId: session.user.id },
+      const record = await prisma.writingRecord.findFirst({
+        where: { id, userId },
         include: { suggestions: true },
       });
 
       if (!record) {
-        return NextResponse.json({ error: "记录不存在" }, { status: 404 });
+        return NextResponse.json({ error: "记录不存在", code: "NOT_FOUND" }, { status: 404 });
       }
 
       return NextResponse.json({
@@ -51,7 +47,7 @@ export async function GET(request: Request) {
     }
 
     const records = await prisma.writingRecord.findMany({
-      where: { userId: session.user.id },
+      where: { userId },
       orderBy: { createdAt: "desc" },
       take: 50,
       select: {
@@ -63,29 +59,34 @@ export async function GET(request: Request) {
       },
     });
 
-    const formatted = records.map((r) => ({
-      id: r.id,
-      title: r.title || "未命名作文",
-      content: r.content,
-      score: r.score,
-      createdAt: r.createdAt.toISOString(),
-      wordCount: r.content.split(/[^a-zA-Z]+/).filter((w) => w.length >= 2).length,
+    const formatted = records.map((record) => ({
+      id: record.id,
+      title: record.title || "未命名作文",
+      content: record.content,
+      score: record.score,
+      createdAt: record.createdAt.toISOString(),
+      wordCount: record.content.split(/[^a-zA-Z]+/).filter((word) => word.length >= 2).length,
     }));
 
     return NextResponse.json({ records: formatted });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "服务器错误";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(error, 500, "INTERNAL_ERROR", request);
   }
 }
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request, {
+    key: "writing",
+    maxRequests: 60,
+    windowMs: 60 * 1000,
+  });
+  if (limited) return limited;
+
   try {
-    const session = await auth();
     const body = await request.json();
 
     const validateResult = validateSchema.safeParse(body);
-    if (validateResult.success) {
+    if (validateResult.success && !("content" in body)) {
       const cacheStatus = getCacheStatus();
       if (!cacheStatus.isLoaded) {
         await loadWordCache();
@@ -96,17 +97,18 @@ export async function POST(request: Request) {
         maxRepeatedWords: validateResult.data.maxRepeatedWords,
       });
 
-      return NextResponse.json(result);
+      return NextResponse.json({
+        ...result,
+        source: "rule",
+        degraded: false,
+      });
     }
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "请先登录" }, { status: 401 });
-    }
-
+    const userId = await requireApiAuth();
     const parsed = saveWritingSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "参数校验失败", details: parsed.error.flatten() },
+        { error: "参数校验失败", code: "VALIDATION_ERROR", details: parsed.error.flatten() },
         { status: 400 },
       );
     }
@@ -124,7 +126,7 @@ export async function POST(request: Request) {
 
     const record = await prisma.writingRecord.create({
       data: {
-        userId: session.user.id,
+        userId,
         title,
         content,
         score,
@@ -138,7 +140,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ id: record.id });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "服务器错误";
-    return NextResponse.json({ error: message }, { status: 500 });
+    if (error instanceof UnauthorizedError) {
+      return apiError(error, 401, "UNAUTHORIZED", request);
+    }
+    return apiError(error, 500, "INTERNAL_ERROR", request);
   }
 }

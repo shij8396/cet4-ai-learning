@@ -12,12 +12,20 @@ function getTodayRange() {
   return { start, end };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const userId = await getAuthUserIdOrError();
     const { start, end } = getTodayRange();
+    const now = new Date();
 
-    const [dailyStat, weakWordCount, recentDictationWrongCount] = await Promise.all([
+    const [
+      dailyStat,
+      dueWordCount,
+      weakWordCount,
+      recentDictationWrongCount,
+      unreadArticleCount,
+      lastWriting,
+    ] = await Promise.all([
       prisma.dailyStat.findFirst({
         where: {
           userId,
@@ -25,6 +33,12 @@ export async function GET() {
             gte: start,
             lt: end,
           },
+        },
+      }),
+      prisma.userWordProgress.count({
+        where: {
+          userId,
+          nextReviewTime: { lte: now },
         },
       }),
       prisma.userWordProgress.count({
@@ -39,20 +53,82 @@ export async function GET() {
           isCorrect: false,
         },
       }),
+      prisma.readingArticle.count({
+        where: {
+          userProgress: {
+            none: {
+              userId,
+              isCompleted: true,
+            },
+          },
+        },
+      }),
+      prisma.writingRecord.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        select: { createdAt: true },
+      }),
     ]);
 
-    return apiSuccess(
-      buildTodayDashboard({
-        wordsLearned: dailyStat?.wordsLearned ?? 0,
-        wordsReviewed: dailyStat?.wordsReviewed ?? 0,
-        articlesRead: dailyStat?.articlesRead ?? 0,
-        dictations: dailyStat?.dictations ?? 0,
-        writingCount: dailyStat?.writingCount ?? 0,
-        studyMinutes: dailyStat?.studyMinutes ?? 0,
-        weakPointCount: weakWordCount + recentDictationWrongCount,
-      }),
+    const unresolvedWeaknessCount = weakWordCount + recentDictationWrongCount;
+
+    const dashboard = buildTodayDashboard({
+      wordsLearned: dailyStat?.wordsLearned ?? 0,
+      wordsReviewed: dailyStat?.wordsReviewed ?? 0,
+      articlesRead: dailyStat?.articlesRead ?? 0,
+      dictations: dailyStat?.dictations ?? 0,
+      writingCount: dailyStat?.writingCount ?? 0,
+      studyMinutes: dailyStat?.studyMinutes ?? 0,
+      weakPointCount: unresolvedWeaknessCount,
+      dueWordCount,
+      unreadArticleCount,
+      unresolvedWeaknessCount,
+      lastWritingAt: lastWriting?.createdAt ?? null,
+    });
+
+    await Promise.all(
+      dashboard.tasks.map((task) =>
+        prisma.studyTask.upsert({
+          where: {
+            userId_type_refId_dueDate: {
+              userId,
+              type: task.type,
+              refId: "daily",
+              dueDate: new Date(task.dueAt),
+            },
+          },
+          update: {
+            title: task.title,
+            description: task.description,
+            href: task.href,
+            target: task.target,
+            current: task.current,
+            priority: task.priority,
+            status: task.status,
+            source: task.source,
+            completedAt: task.status === "done" ? new Date() : null,
+          },
+          create: {
+            userId,
+            type: task.type,
+            refId: "daily",
+            title: task.title,
+            description: task.description,
+            href: task.href,
+            target: task.target,
+            current: task.current,
+            priority: task.priority,
+            status: task.status,
+            source: task.source,
+            dueDate: new Date(task.dueAt),
+            completedAt: task.status === "done" ? new Date() : null,
+          },
+        }),
+      ),
     );
+
+    return apiSuccess(dashboard);
   } catch (error) {
-    return handleApiError(error);
+    return handleApiError(error, request);
   }
 }

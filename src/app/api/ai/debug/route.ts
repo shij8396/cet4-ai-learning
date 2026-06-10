@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { apiError, enforceRateLimit, requireAdmin } from "@/lib/api-helpers";
+import { writeAuditLog } from "@/lib/audit";
 import {
   getDebugLogs,
   getProviderStats,
@@ -9,12 +11,27 @@ import {
   getAvailableProviders,
 } from "@/services/ai";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const limited = enforceRateLimit(request, {
+    key: "ai-debug",
+    maxRequests: 60,
+    windowMs: 60 * 1000,
+  });
+  if (limited) return limited;
+
   try {
+    const userId = await requireAdmin();
     const logs = getDebugLogs(50);
     const stats = getProviderStats();
     const cache = getCacheStats();
     const providers = getAvailableProviders();
+
+    await writeAuditLog({
+      userId,
+      action: "read",
+      resource: "ai_debug",
+      request,
+    });
 
     return NextResponse.json({
       logs,
@@ -24,18 +41,32 @@ export async function GET() {
       availableProviders: providers,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "服务器错误";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(error, 500, "INTERNAL_ERROR", request);
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  const limited = enforceRateLimit(request, {
+    key: "ai-debug-clear",
+    maxRequests: 10,
+    windowMs: 60 * 1000,
+  });
+  if (limited) return limited;
+
   try {
+    const userId = await requireAdmin();
     clearDebugLogs();
     invalidateCache();
+
+    await writeAuditLog({
+      userId,
+      action: "clear",
+      resource: "ai_debug",
+      request,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "服务器错误";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(error, 500, "INTERNAL_ERROR", request);
   }
 }

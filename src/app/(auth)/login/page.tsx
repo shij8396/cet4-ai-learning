@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { LogIn, Loader2 } from "lucide-react";
+import { Loader2, LogIn } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 
 const loginSchema = z.object({
   email: z.string().email("请输入有效的邮箱地址"),
-  password: z.string().min(6, "密码至少6位"),
+  password: z.string().min(6, "密码至少 6 位"),
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
@@ -71,16 +71,17 @@ export default function LoginPage() {
           <LogIn className="h-8 w-8 text-primary" />
         </div>
         <CardTitle className="text-2xl">欢迎回来</CardTitle>
-        <CardDescription>登录你的账号继续学习</CardDescription>
+        <CardDescription>登录账号后继续你的四级学习计划</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" data-testid="login-form">
           <div className="space-y-2">
             <Label htmlFor="email">邮箱</Label>
             <Input
               id="email"
               type="email"
               placeholder="name@example.com"
+              data-testid="login-email"
               {...register("email")}
               disabled={loading}
             />
@@ -91,7 +92,8 @@ export default function LoginPage() {
             <Input
               id="password"
               type="password"
-              placeholder="输入密码"
+              placeholder="请输入密码"
+              data-testid="login-password"
               {...register("password")}
               disabled={loading}
             />
@@ -99,7 +101,13 @@ export default function LoginPage() {
               <p className="text-xs text-destructive">{errors.password.message}</p>
             )}
           </div>
-          <Button type="submit" className="w-full" size="lg" disabled={loading}>
+          <Button
+            type="submit"
+            className="w-full"
+            size="lg"
+            disabled={loading}
+            data-testid="login-submit"
+          >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (

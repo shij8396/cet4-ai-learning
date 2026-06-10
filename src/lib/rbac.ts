@@ -23,7 +23,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 };
 
 export function getUserRole(userId?: string): UserRole {
-  const adminIds = (process.env.ADMIN_USER_IDS || "").split(",").filter(Boolean);
+  const adminIds = (process.env.ADMIN_USER_IDS || "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
   if (userId && adminIds.includes(userId)) {
     return "ADMIN";
   }
@@ -39,9 +42,9 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
   );
 }
 
-export function requirePermission(role: UserRole, permission: Permission): void {
+export function requireRolePermission(role: UserRole, permission: Permission): void {
   if (!hasPermission(role, permission)) {
-    throw new Error(`权限不足: 需要 ${permission.action}:${permission.resource} 权限`);
+    throw new Error(`权限不足：需要 ${permission.action}:${permission.resource} 权限`);
   }
 }
 

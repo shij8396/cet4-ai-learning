@@ -59,6 +59,9 @@ export interface GeneratedSentence {
   targetWord: string;
   difficulty: number;
   words: string[];
+  source?: "ai" | "rule";
+  degraded?: boolean;
+  degradationReason?: string;
 }
 
 export interface GeneratedReading {
@@ -69,6 +72,9 @@ export interface GeneratedReading {
   vocabularyCoverage: number;
   newWords: string[];
   questions: GeneratedQuestion[];
+  source?: "ai" | "rule";
+  degraded?: boolean;
+  degradationReason?: string;
 }
 
 export interface GeneratedQuestion {
@@ -86,6 +92,9 @@ export interface StudyRecommendation {
   focusAreas: string[];
   difficulty: number;
   reason: string;
+  source?: "ai" | "rule";
+  degraded?: boolean;
+  degradationReason?: string;
 }
 
 export interface DailyPlan {
@@ -97,6 +106,9 @@ export interface DailyPlan {
   writingTask: { topic: string; wordTarget: number; estimatedTime: number };
   totalEstimatedTime: number;
   tips: string[];
+  source?: "ai" | "rule";
+  degraded?: boolean;
+  degradationReason?: string;
 }
 
 export interface WeaknessReport {
@@ -104,6 +116,9 @@ export interface WeaknessReport {
   commonMistakeTypes: Array<{ type: string; count: number }>;
   suggestedExercises: string[];
   improvementAreas: string[];
+  source?: "ai" | "rule";
+  degraded?: boolean;
+  degradationReason?: string;
 }
 
 export interface WritingCoachSuggestion {
@@ -111,6 +126,9 @@ export interface WritingCoachSuggestion {
   original: string;
   suggested: string;
   explanation: string;
+  source?: "ai" | "rule";
+  degraded?: boolean;
+  degradationReason?: string;
 }
 
 export interface CacheEntry<T> {

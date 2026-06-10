@@ -4,7 +4,10 @@ import { validateAIContent, extractJSON } from "../validators/aiContentValidator
 
 import type { GeneratedSentence } from "../types";
 
-function buildLocalSentences(word: string): GeneratedSentence[] {
+function buildLocalSentences(
+  word: string,
+  reason = "AI 例句生成不可用，已使用本地模板",
+): GeneratedSentence[] {
   const lower = word.toLowerCase();
   const sentences: GeneratedSentence[] = [];
 
@@ -14,6 +17,9 @@ function buildLocalSentences(word: string): GeneratedSentence[] {
     targetWord: word,
     difficulty: 1,
     words: ["think", "important", "students"].concat(lower.split(/\s+/)),
+    source: "rule",
+    degraded: true,
+    degradationReason: reason,
   });
 
   sentences.push({
@@ -22,6 +28,9 @@ function buildLocalSentences(word: string): GeneratedSentence[] {
     targetWord: word,
     difficulty: 1,
     words: ["should", "learn", "more", "about", "every", "day"].concat(lower.split(/\s+/)),
+    source: "rule",
+    degraded: true,
+    degradationReason: reason,
   });
 
   sentences.push({
@@ -30,6 +39,9 @@ function buildLocalSentences(word: string): GeneratedSentence[] {
     targetWord: word,
     difficulty: 2,
     words: ["good", "way", "improve", "our", "skills"].concat(lower.split(/\s+/)),
+    source: "rule",
+    degraded: true,
+    degradationReason: reason,
   });
 
   return sentences;
@@ -70,7 +82,7 @@ export async function generateSentences(params: {
     });
 
     if (!validation.passed && validation.retryCount >= 2) {
-      return buildLocalSentences(word);
+      return buildLocalSentences(word, "AI 例句未通过四级词汇校验，已使用本地模板");
     }
 
     return json.map((s) => ({
@@ -79,8 +91,11 @@ export async function generateSentences(params: {
       targetWord: word,
       difficulty: params.level || 1,
       words: s.words || [],
+      source: "ai",
+      degraded: false,
     }));
-  } catch {
-    return buildLocalSentences(word);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "AI 例句生成不可用";
+    return buildLocalSentences(word, reason);
   }
 }

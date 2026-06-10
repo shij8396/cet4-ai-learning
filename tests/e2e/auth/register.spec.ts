@@ -1,45 +1,46 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-import { registerAs, expectToast, generateUniqueEmail } from "../utils/helpers";
+import { expectToast, generateUniqueEmail, registerAs } from "../utils/helpers";
 
 test.describe("Register", () => {
-  test("正常注册", async ({ page }) => {
+  test("registers a new user", async ({ page }) => {
     const email = generateUniqueEmail();
     await registerAs(page, "E2E User", email, "Test123!", "Test123!");
-    await expectToast(page, "注册成功！欢迎加入");
+    await expectToast(page, "注册成功，欢迎加入");
   });
 
-  test("重复邮箱", async ({ page }) => {
+  test("rejects duplicate email", async ({ page }) => {
     const email = generateUniqueEmail();
     await registerAs(page, "E2E User", email, "Test123!", "Test123!");
-    await page.waitForTimeout(3000);
+    await expectToast(page, "注册成功，欢迎加入");
 
     await page.goto("/register");
     await registerAs(page, "E2E User", email, "Test123!", "Test123!");
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000);
     await expect(page).toHaveURL(/\/register/);
   });
 
-  test("非法邮箱", async ({ page }) => {
+  test("rejects invalid email", async ({ page }) => {
     await page.goto("/register");
-    await page.locator("#email").fill("notanemail");
-    await page.getByRole("button", { name: "注册" }).click();
-    await page.waitForTimeout(2000);
-    await expect(page).toHaveURL(/\/register/);
+    await page.getByTestId("register-email").fill("notanemail");
+    await page.getByTestId("register-submit").click();
+    await expect(page.getByText("请输入有效的邮箱地址")).toBeVisible();
   });
 
-  test("密码长度不足", async ({ page }) => {
+  test("rejects short password", async ({ page }) => {
     await page.goto("/register");
-    await page.locator("#password").fill("12");
-    await page.getByRole("button", { name: "注册" }).click();
-    await expect(page.getByText("密码至少6位")).toBeVisible();
+    await page.getByTestId("register-password").fill("12");
+    await page.getByTestId("register-submit").click();
+    await expect(page.getByText("密码至少 6 位")).toBeVisible();
   });
 
-  test("两次密码不一致", async ({ page }) => {
+  test("rejects mismatched passwords", async ({ page }) => {
     await page.goto("/register");
-    await page.locator("#password").fill("Test123!");
-    await page.locator("#confirmPassword").fill("Different1!");
-    await page.getByRole("button", { name: "注册" }).click();
+    await page.getByTestId("register-name").fill("E2E User");
+    await page.getByTestId("register-email").fill(generateUniqueEmail());
+    await page.getByTestId("register-password").fill("Test123!");
+    await page.getByTestId("register-confirm-password").fill("Different1!");
+    await page.getByTestId("register-submit").click();
     await expect(page.getByText("两次密码不一致")).toBeVisible();
   });
 });

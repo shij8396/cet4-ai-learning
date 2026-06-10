@@ -7,7 +7,31 @@ import {
 import { generateText } from "../providers";
 import { extractJSON } from "../validators/aiContentValidator";
 
-import type { StudyRecommendation, DailyPlan, WeaknessReport } from "../types";
+import type { DailyPlan, StudyRecommendation, WeaknessReport } from "../types";
+
+function reasonFromError(error: unknown) {
+  if (error && typeof error === "object" && "message" in error) {
+    return String((error as { message?: unknown }).message ?? "AI service unavailable");
+  }
+  return "AI service unavailable";
+}
+
+function ruleRecommendation(params: {
+  userLevel: number;
+  weakWords: string[];
+  reason?: string;
+}): StudyRecommendation {
+  return {
+    recommendedArticles: [],
+    recommendedWords: params.weakWords.slice(0, 5),
+    focusAreas: ["vocabulary", "reading", "writing"],
+    difficulty: Math.max(1, params.userLevel),
+    reason: "基于薄弱词和学习进度生成的规则推荐",
+    source: "rule",
+    degraded: true,
+    degradationReason: params.reason,
+  };
+}
 
 export async function getRecommendations(params: {
   userLevel: number;
@@ -38,17 +62,38 @@ export async function getRecommendations(params: {
       recommendedWords: params.weakWords.slice(0, 5),
       focusAreas: json.focusAreas || ["vocabulary", "reading"],
       difficulty: json.difficulty || params.userLevel,
-      reason: json.reason || "基于你的学习进度推荐",
+      reason: json.reason || "基于学习进度生成的 AI 推荐",
+      source: "ai",
+      degraded: false,
     };
-  } catch {
-    return {
-      recommendedArticles: [],
-      recommendedWords: params.weakWords.slice(0, 5),
-      focusAreas: ["vocabulary", "reading", "writing"],
-      difficulty: Math.max(1, params.userLevel),
-      reason: "基于你的弱项分析推荐",
-    };
+  } catch (error) {
+    return ruleRecommendation({
+      userLevel: params.userLevel,
+      weakWords: params.weakWords,
+      reason: reasonFromError(error),
+    });
   }
+}
+
+function ruleDailyPlan(params: {
+  weakAreas: string[];
+  availableMinutesPerDay: number;
+  reason?: string;
+}): DailyPlan {
+  const minutes = Math.max(20, params.availableMinutesPerDay);
+  return {
+    date: new Date().toISOString().split("T")[0],
+    wordsToLearn: 10,
+    wordsToReview: 20,
+    readingTask: { title: "每日阅读训练", estimatedTime: Math.min(15, minutes) },
+    dictationTask: { wordCount: 10, estimatedTime: 10 },
+    writingTask: { topic: "写一段四级主题短文", wordTarget: 120, estimatedTime: 20 },
+    totalEstimatedTime: Math.max(40, minutes),
+    tips: ["先复习到期词，再学习新词", "阅读后整理生词", "作文优先使用四级核心词"],
+    source: "rule",
+    degraded: true,
+    degradationReason: params.reason,
+  };
 }
 
 export async function generateDailyPlan(params: {
@@ -81,10 +126,10 @@ export async function generateDailyPlan(params: {
 
     return {
       date: new Date().toISOString().split("T")[0],
-      wordsToLearn: json.wordsToLearn || 5,
-      wordsToReview: json.wordsToReview || 10,
+      wordsToLearn: json.wordsToLearn || 10,
+      wordsToReview: json.wordsToReview || 20,
       readingTask: {
-        title: json.readingTask?.title || "每日阅读",
+        title: json.readingTask?.title || "每日阅读训练",
         estimatedTime: json.readingTask?.estimatedTime || 15,
       },
       dictationTask: {
@@ -92,25 +137,44 @@ export async function generateDailyPlan(params: {
         estimatedTime: json.dictationTask?.estimatedTime || 10,
       },
       writingTask: {
-        topic: json.writingTask?.topic || "每日日记",
-        wordTarget: json.writingTask?.wordTarget || 50,
-        estimatedTime: json.writingTask?.estimatedTime || 15,
+        topic: json.writingTask?.topic || "四级主题短文",
+        wordTarget: json.writingTask?.wordTarget || 120,
+        estimatedTime: json.writingTask?.estimatedTime || 20,
       },
-      totalEstimatedTime: json.totalEstimatedTime || 40,
-      tips: json.tips || ["每天坚持学习", "复习比学习新词更重要"],
+      totalEstimatedTime: json.totalEstimatedTime || 45,
+      tips: json.tips || ["每天保持学习节奏", "优先复习错词"],
+      source: "ai",
+      degraded: false,
     };
-  } catch {
-    return {
-      date: new Date().toISOString().split("T")[0],
-      wordsToLearn: 5,
-      wordsToReview: 10,
-      readingTask: { title: "每日阅读练习", estimatedTime: 15 },
-      dictationTask: { wordCount: 10, estimatedTime: 10 },
-      writingTask: { topic: "写一段日记", wordTarget: 50, estimatedTime: 15 },
-      totalEstimatedTime: 40,
-      tips: ["每天坚持学习", "复习比学新词更重要", "多读多写多练"],
-    };
+  } catch (error) {
+    return ruleDailyPlan({
+      weakAreas: params.weakAreas,
+      availableMinutesPerDay: params.availableMinutesPerDay,
+      reason: reasonFromError(error),
+    });
   }
+}
+
+function ruleWeaknessReport(
+  params: {
+    wrongWords: Array<{ word: string; count: number }>;
+    mistakeTypes: Array<{ type: string; count: number }>;
+  },
+  reason?: string,
+): WeaknessReport {
+  return {
+    topErrorWords: params.wrongWords.map((w) => ({
+      word: w.word,
+      count: w.count,
+      type: "spelling",
+    })),
+    commonMistakeTypes: params.mistakeTypes,
+    suggestedExercises: ["重点复习错词", "完成一组听音拼写", "把高频错词加入今日默写"],
+    improvementAreas: ["拼写准确度", "词义辨析", "复习节奏"],
+    source: "rule",
+    degraded: true,
+    degradationReason: reason,
+  };
 }
 
 export async function analyzeWeakness(params: {
@@ -142,18 +206,11 @@ export async function analyzeWeakness(params: {
       })),
       commonMistakeTypes: json.commonMistakeTypes || params.mistakeTypes,
       suggestedExercises: json.suggestedExercises || ["重点复习错词", "多做拼写练习"],
-      improvementAreas: json.improvementAreas || ["拼写准确性", "词汇记忆"],
+      improvementAreas: json.improvementAreas || ["拼写准确度", "词汇记忆"],
+      source: "ai",
+      degraded: false,
     };
-  } catch {
-    return {
-      topErrorWords: params.wrongWords.map((w) => ({
-        word: w.word,
-        count: w.count,
-        type: "spelling",
-      })),
-      commonMistakeTypes: params.mistakeTypes,
-      suggestedExercises: ["重点复习错词", "多做听写练习"],
-      improvementAreas: ["拼写准确性"],
-    };
+  } catch (error) {
+    return ruleWeaknessReport(params, reasonFromError(error));
   }
 }

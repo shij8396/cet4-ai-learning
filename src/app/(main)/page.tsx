@@ -60,6 +60,9 @@ const fallbackDashboard: TodayDashboard = {
       current: 0,
       progress: 0,
       status: "pending",
+      priority: 3,
+      dueAt: new Date().toISOString(),
+      source: "system",
     },
     {
       type: "reading",
@@ -70,6 +73,9 @@ const fallbackDashboard: TodayDashboard = {
       current: 0,
       progress: 0,
       status: "pending",
+      priority: 2,
+      dueAt: new Date().toISOString(),
+      source: "system",
     },
     {
       type: "dictation",
@@ -80,6 +86,9 @@ const fallbackDashboard: TodayDashboard = {
       current: 0,
       progress: 0,
       status: "pending",
+      priority: 2,
+      dueAt: new Date().toISOString(),
+      source: "weakness",
     },
     {
       type: "writing",
@@ -90,6 +99,9 @@ const fallbackDashboard: TodayDashboard = {
       current: 0,
       progress: 0,
       status: "pending",
+      priority: 1,
+      dueAt: new Date().toISOString(),
+      source: "system",
     },
   ],
 };

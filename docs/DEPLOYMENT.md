@@ -1,13 +1,14 @@
 # Deployment Notes
 
-This project keeps SQLite as the default local database because it is fast to start and easy to inspect. For a shared production deployment, use PostgreSQL or another managed relational database.
+This project is PostgreSQL-first. SQLite is no longer the enterprise default path.
 
 ## Local Development
 
 ```bash
 cp .env.example .env.local
 npm install
-npm run db:push
+docker compose up -d db
+npm run db:deploy
 npx tsx prisma/seed.ts
 npm run dev
 ```
@@ -15,37 +16,50 @@ npm run dev
 Recommended local values:
 
 ```env
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="postgresql://postgres:password@localhost:5432/cet4_learning"
 AUTH_SECRET="replace-with-a-long-random-secret"
 AUTH_URL="http://localhost:3000"
+ADMIN_USER_IDS=""
 ```
 
 ## Production Checklist
 
-- Use a managed PostgreSQL database instead of `dev.db`.
+- Use a managed PostgreSQL database.
 - Set a long random `AUTH_SECRET`.
+- Configure `AUTH_URL` to the public application origin.
 - Keep AI provider keys optional; the core study flow must still run when AI calls fail.
-- Run `npm run check`, `npm test`, and `npm run build` before deploying.
-- Do not upload `.env*`, `dev.db`, Playwright auth state, build outputs, or logs.
+- Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`.
+- Run `npm run db:deploy` before starting the application.
+- Do not upload `.env*`, Playwright auth state, build outputs, logs, or database dumps.
 
-## PostgreSQL Path
+## Database Migration
 
-The current Prisma schema is SQLite-first. Before moving production traffic to PostgreSQL, create a PostgreSQL migration branch and verify these steps:
-
-```bash
-npm run db:generate
-npm run db:migrate
-npm run check
-npm test
-npm run build
-```
-
-Then seed the CET-4 word list in the target database:
+For a fresh PostgreSQL database:
 
 ```bash
+npm run db:deploy
 npx tsx prisma/seed.ts
 ```
 
+For schema changes:
+
+```bash
+npx prisma migrate dev --name <change_name>
+npm run db:generate
+npm test
+```
+
+The seed script imports the CET-4 word list from `data/cet4-words.json` and creates a local test account.
+
+## Health Checks
+
+- `GET /api/health`: process liveness.
+- `GET /api/ready`: database connectivity, CET-4 word count, and AI provider configuration.
+
+Use `/api/ready` as the stronger deployment readiness probe.
+
 ## GitHub Actions
 
-The repository can run automated checks with GitHub Actions, but publishing workflow files requires a GitHub token that includes the `workflow` scope. If that scope is not available, keep the workflow local and run the commands above before pushing.
+The repository includes a CI workflow for format, lint, typecheck, unit tests, production build, PostgreSQL migration/seed, and Playwright smoke tests.
+
+Publishing workflow files requires a GitHub token with the `workflow` scope. If your token lacks that scope, run the same commands locally before pushing code.

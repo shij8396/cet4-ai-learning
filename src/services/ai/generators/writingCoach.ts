@@ -38,8 +38,12 @@ export async function getWritingCoachSuggestions(params: {
       original: s.original || "",
       suggested: s.suggested || "",
       explanation: s.explanation || "",
+      source: "ai",
+      degraded: false,
     }));
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "AI 写作助手不可用";
+
     if (mode === "simplify") {
       const result = simplifyText({ originalText });
       return result.changes.map((c) => ({
@@ -47,6 +51,9 @@ export async function getWritingCoachSuggestions(params: {
         original: c.original,
         suggested: c.simplified,
         explanation: c.reason,
+        source: "rule",
+        degraded: true,
+        degradationReason: reason,
       }));
     }
 
@@ -54,8 +61,11 @@ export async function getWritingCoachSuggestions(params: {
       {
         type: "expression",
         original: originalText.slice(0, 100),
-        suggested: "请尝试使用更简单的表达方式",
-        explanation: "建议使用简短的句子和CET4词汇",
+        suggested: "请尝试使用更清晰、更符合四级水平的表达",
+        explanation: "建议使用较短句子和 CET-4 核心词汇，避免复杂表达影响准确性",
+        source: "rule",
+        degraded: true,
+        degradationReason: reason,
       },
     ];
   }

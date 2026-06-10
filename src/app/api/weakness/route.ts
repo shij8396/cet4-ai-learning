@@ -75,6 +75,18 @@ export async function GET() {
       }),
     ]);
 
+    const resolvedAuditLogs = await prisma.auditLog.findMany({
+      where: {
+        userId,
+        action: "resolve",
+        resource: "weakness",
+      },
+      select: {
+        refId: true,
+      },
+      take: 500,
+    });
+
     const items = buildWeaknessList({
       wordProgress: wordProgress.map((record) => ({
         id: record.id,
@@ -83,12 +95,14 @@ export async function GET() {
         meaning: record.word.meaning,
         wrongCount: record.wrongCount,
         masteryLevel: record.masteryLevel,
+        updatedAt: record.updatedAt,
       })),
       readingProgress: readingProgress.map((record) => ({
         id: record.id,
         articleTitle: record.article.title,
         unknownWords: parseJsonArray(record.unknownWords),
         clickedWords: parseJsonArray(record.clickedWords),
+        updatedAt: record.updatedAt,
       })),
       dictationRecords: dictationRecords.map((record) => ({
         id: record.id,
@@ -96,13 +110,16 @@ export async function GET() {
         correctAnswer: record.correctAnswer,
         userAnswer: record.userAnswer,
         isCorrect: record.isCorrect,
+        createdAt: record.createdAt,
       })),
       writingRecords: writingRecords.map((record) => ({
         id: record.id,
         title: record.title,
         outOfLevelWords: parseJsonArray(record.outOfLevelWords),
         spellingErrors: normalizeStringList(record.spellingErrors),
+        updatedAt: record.updatedAt,
       })),
+      resolvedKeys: resolvedAuditLogs.map((log) => log.refId).filter(Boolean) as string[],
     });
 
     return apiSuccess({

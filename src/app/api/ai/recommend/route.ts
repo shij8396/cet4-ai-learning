@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 
-import { auth } from "@/lib/auth";
+import { apiError, enforceRateLimit, requireApiAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 import { getRecommendations } from "@/services/ai";
-import { getFromCache, setCache, getCacheKey } from "@/services/ai/cache";
+import { getCacheKey, getFromCache, setCache } from "@/services/ai/cache";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const limited = enforceRateLimit(request, {
+    key: "ai-recommend",
+    maxRequests: Number(process.env.AI_RATE_LIMIT_PER_HOUR) || 20,
+    windowMs: 60 * 60 * 1000,
+  });
+  if (limited) return limited;
+
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "请先登录" }, { status: 401 });
-    }
+    const userId = await requireApiAuth();
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       select: {
         level: true,
         masteredWords: true,
@@ -22,7 +26,7 @@ export async function GET() {
 
     const wrongWords = await prisma.wordReviewRecord.findMany({
       where: {
-        userId: session.user.id,
+        userId,
         result: "wrong",
       },
       orderBy: { createdAt: "desc" },
@@ -34,7 +38,7 @@ export async function GET() {
     const weakWordList = wrongWords.map((r) => r.word.word);
 
     const cacheKey = getCacheKey("recommend", {
-      userId: session.user.id,
+      userId,
       level: user?.level || 1,
     });
     const cached = getFromCache(cacheKey);
@@ -55,7 +59,6 @@ export async function GET() {
 
     return NextResponse.json(result);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "服务器错误";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return apiError(error, 500, "INTERNAL_ERROR", request);
   }
 }

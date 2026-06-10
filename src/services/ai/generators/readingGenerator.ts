@@ -7,7 +7,11 @@ import { validateAIContent, extractJSON } from "../validators/aiContentValidator
 import type { GeneratedReading, GeneratedQuestion } from "../types";
 import type { ReadingArticleType } from "@/types";
 
-function getLocalArticle(params: { level?: number; topic?: string }): GeneratedReading {
+function getLocalArticle(params: {
+  level?: number;
+  topic?: string;
+  reason?: string;
+}): GeneratedReading {
   const { level = 1, topic } = params;
 
   const matching = READING_ARTICLES.filter((a: ReadingArticleType) => {
@@ -27,6 +31,9 @@ function getLocalArticle(params: { level?: number; topic?: string }): GeneratedR
     wordCount: article.wordCount,
     vocabularyCoverage: article.vocabularyCoverage,
     newWords: [],
+    source: "rule",
+    degraded: true,
+    degradationReason: params.reason ?? "AI 阅读生成不可用，已使用本地阅读材料",
     questions: [
       {
         id: "q1",
@@ -95,9 +102,14 @@ export async function generateReading(params: {
       }
     }
 
-    return reading;
-  } catch {
-    return getLocalArticle(params);
+    return {
+      ...reading,
+      source: "ai",
+      degraded: false,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "AI 阅读生成不可用";
+    return getLocalArticle({ ...params, reason });
   }
 }
 

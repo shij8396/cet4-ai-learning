@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 
 import { calculateWordReviewSchedule } from "@/features/study/services/reviewScheduler";
-import { getAuthUserIdOrError, handleApiError } from "@/lib/api-helpers";
+import { enforceRateLimit, getAuthUserIdOrError, handleApiError } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
+  const limited = enforceRateLimit(request, {
+    key: "dictation-submit",
+    maxRequests: 120,
+    windowMs: 60 * 1000,
+  });
+  if (limited) return limited;
+
   try {
     const userId = await getAuthUserIdOrError();
     const body = await request.json();

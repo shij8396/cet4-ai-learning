@@ -25,10 +25,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials) return null;
 
-        const email = credentials.email as string;
-        const password = credentials.password as string;
-        const name = credentials.name as string;
-        const isRegistering = credentials.isRegistering as string;
+        const email = String(credentials.email || "")
+          .trim()
+          .toLowerCase();
+        const password = String(credentials.password || "");
+        const name = String(credentials.name || "").trim();
+        const isRegistering = String(credentials.isRegistering || "");
 
         if (!email || !password) {
           throw new Error("邮箱和密码不能为空");
