@@ -1,6 +1,6 @@
 import {
-  AppError,
   AIServiceError,
+  AppError,
   AuthError,
   ForbiddenError,
   NotFoundError,
@@ -144,7 +144,7 @@ export function createAPI() {
     },
 
     delete<T = unknown>(url: string, options?: FetchOptions) {
-      return apiClient<T>(url, { ...options, method: "DELETE", ...options });
+      return apiClient<T>(url, { ...options, method: "DELETE" });
     },
   };
 }

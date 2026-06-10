@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { calculateWordReviewSchedule } from "@/features/study/services/reviewScheduler";
 import { getAuthUserIdOrError, handleApiError } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
-import { wordReviewSchema, getNextReviewDate } from "@/lib/validators/wordSchemas";
+import { wordReviewSchema } from "@/lib/validators/wordSchemas";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -29,18 +30,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       where: { userId_wordId: { userId, wordId } },
     });
 
-    const now = new Date();
-    const newReviewCount = (existing?.reviewCount || 0) + 1;
-    const nextReviewTime = getNextReviewDate(newReviewCount);
-
-    const isWrong = result === "wrong";
-
-    let newMasteryLevel = existing?.masteryLevel || 0;
-    if (result === "correct" && newMasteryLevel < 5) {
-      newMasteryLevel += 1;
-    } else if (result === "wrong" && newMasteryLevel > 0) {
-      newMasteryLevel -= 1;
-    }
+    const progressData = calculateWordReviewSchedule(existing ?? {}, result);
 
     const reviewRecord = await prisma.wordReviewRecord.create({
       data: {
@@ -51,29 +41,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       },
     });
 
-    const progressData = {
-      reviewCount: newReviewCount,
-      wrongCount: existing ? existing.wrongCount + (isWrong ? 1 : 0) : isWrong ? 1 : 0,
-      lastReviewTime: now,
-      nextReviewTime,
-      masteryLevel: newMasteryLevel,
-    };
-
-    let progress;
-    if (existing) {
-      progress = await prisma.userWordProgress.update({
-        where: { id: existing.id },
-        data: progressData,
-      });
-    } else {
-      progress = await prisma.userWordProgress.create({
-        data: {
-          userId,
-          wordId,
-          ...progressData,
-        },
-      });
-    }
+    const progress = existing
+      ? await prisma.userWordProgress.update({
+          where: { id: existing.id },
+          data: progressData,
+        })
+      : await prisma.userWordProgress.create({
+          data: {
+            userId,
+            wordId,
+            ...progressData,
+          },
+        });
 
     return NextResponse.json({
       review: reviewRecord,

@@ -24,6 +24,7 @@ describe("study dashboard builders", () => {
     expect(dashboard.tasks.find((task) => task.type === "reading")?.status).toBe("done");
     expect(dashboard.tasks.find((task) => task.type === "words")?.progress).toBe(20);
     expect(dashboard.summary.weakPointCount).toBe(6);
+    expect(dashboard.tasks.find((task) => task.type === "words")?.title).toBe("单词学习");
   });
 
   it("deduplicates weak points across words, reading, dictation, and writing", () => {

@@ -2,7 +2,16 @@ import { NextResponse } from "next/server";
 
 import { getAuthUserIdOrError, handleApiError } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
-import { wordProgressSchema, getNextReviewDate } from "@/lib/validators/wordSchemas";
+import { wordProgressSchema } from "@/lib/validators/wordSchemas";
+
+function nextManualReviewTime(masteryLevel: number, now = new Date()) {
+  const intervalsByMastery = [1, 1, 2, 7, 15, 30];
+  const days = intervalsByMastery[Math.max(0, Math.min(5, masteryLevel))];
+  const next = new Date(now);
+  next.setDate(next.getDate() + days);
+  next.setHours(8, 0, 0, 0);
+  return next;
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -24,28 +33,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     const { masteryLevel } = parsed.data;
-
-    const existing = await prisma.userWordProgress.findUnique({
-      where: { userId_wordId: { userId, wordId } },
-    });
-
     const now = new Date();
-    const nextReviewTime = getNextReviewDate(existing ? existing.reviewCount : 0);
+    const nextReviewTime = nextManualReviewTime(masteryLevel, now);
 
-    if (existing) {
-      const updated = await prisma.userWordProgress.update({
-        where: { id: existing.id },
-        data: {
-          masteryLevel,
-          lastReviewTime: now,
-          nextReviewTime,
-        },
-      });
-      return NextResponse.json({ progress: updated });
-    }
-
-    const created = await prisma.userWordProgress.create({
-      data: {
+    const progress = await prisma.userWordProgress.upsert({
+      where: { userId_wordId: { userId, wordId } },
+      update: {
+        masteryLevel,
+        lastReviewTime: now,
+        nextReviewTime,
+      },
+      create: {
         userId,
         wordId,
         masteryLevel,
@@ -56,7 +54,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       },
     });
 
-    return NextResponse.json({ progress: created });
+    return NextResponse.json({ progress });
   } catch (error) {
     return handleApiError(error);
   }

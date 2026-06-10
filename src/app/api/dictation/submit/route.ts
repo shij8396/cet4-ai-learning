@@ -1,15 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { auth } from "@/lib/auth";
+import { calculateWordReviewSchedule } from "@/features/study/services/reviewScheduler";
+import { getAuthUserIdOrError, handleApiError } from "@/lib/api-helpers";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
-    const authSession = await auth();
-    if (!authSession?.user?.id) {
-      return NextResponse.json({ error: "未授权" }, { status: 401 });
-    }
-
+    const userId = await getAuthUserIdOrError();
     const body = await request.json();
     const {
       sessionId,
@@ -24,74 +21,95 @@ export async function POST(request: Request) {
       timeSpent,
     } = body;
 
-    if (!sessionId) {
-      return NextResponse.json({ error: "缺少会话ID" }, { status: 400 });
+    if (!sessionId || typeof sessionId !== "string") {
+      return NextResponse.json({ error: "缺少会话 ID" }, { status: 400 });
     }
 
-    const record = await prisma.dictationRecord.create({
-      data: {
-        sessionId,
-        userId: authSession.user.id,
-        wordId: wordId || null,
-        word: word || correctAnswer,
-        prompt: prompt || "",
-        userAnswer: userAnswer || null,
-        correctAnswer: correctAnswer || "",
-        isCorrect: isCorrect ?? false,
-        type: type || "cn_to_en",
-        errorType: errorType || null,
-        timeSpent: timeSpent || 0,
-      },
+    const session = await prisma.dictationSession.findFirst({
+      where: { id: sessionId, userId },
+      select: { id: true },
     });
 
-    if (isCorrect) {
-      await prisma.dictationSession.update({
-        where: { id: sessionId },
-        data: {
-          correctCount: { increment: 1 },
-        },
-      });
-    } else {
-      await prisma.dictationSession.update({
-        where: { id: sessionId },
-        data: {
-          wrongCount: { increment: 1 },
-        },
-      });
+    if (!session) {
+      return NextResponse.json({ error: "默写会话不存在或无权访问" }, { status: 404 });
     }
 
-    if (wordId) {
-      const existingProgress = await prisma.userWordProgress.findUnique({
-        where: {
-          userId_wordId: {
-            userId: authSession.user.id,
-            wordId,
-          },
-        },
-      });
-
-      if (existingProgress) {
-        await prisma.userWordProgress.update({
-          where: {
-            userId_wordId: {
-              userId: authSession.user.id,
-              wordId,
+    const normalizedIsCorrect = Boolean(isCorrect);
+    const existingProgress =
+      typeof wordId === "string" && wordId
+        ? await prisma.userWordProgress.findUnique({
+            where: {
+              userId_wordId: {
+                userId,
+                wordId,
+              },
             },
-          },
-          data: {
-            reviewCount: { increment: 1 },
-            wrongCount: isCorrect ? undefined : { increment: 1 },
-            masteryLevel: isCorrect
-              ? Math.min(5, existingProgress.masteryLevel + 0.5)
-              : Math.max(0, existingProgress.masteryLevel - 0.5),
-            lastReviewTime: new Date(),
-          },
+          })
+        : null;
+
+    const [record] = await prisma.$transaction(async (tx) => {
+      const createdRecord = await tx.dictationRecord.create({
+        data: {
+          sessionId,
+          userId,
+          wordId: typeof wordId === "string" && wordId ? wordId : null,
+          word: word || correctAnswer || "",
+          prompt: prompt || "",
+          userAnswer: userAnswer || null,
+          correctAnswer: correctAnswer || "",
+          isCorrect: normalizedIsCorrect,
+          type: type || "cn_to_en",
+          errorType: errorType || null,
+          timeSpent: Number.isFinite(Number(timeSpent)) ? Number(timeSpent) : 0,
+        },
+      });
+
+      await tx.dictationSession.update({
+        where: { id: sessionId },
+        data: normalizedIsCorrect
+          ? { correctCount: { increment: 1 } }
+          : { wrongCount: { increment: 1 } },
+      });
+
+      if (typeof wordId === "string" && wordId) {
+        const linkedWord = await tx.word.findUnique({
+          where: { id: wordId },
+          select: { id: true },
         });
+
+        if (linkedWord) {
+          const progressData = calculateWordReviewSchedule(
+            existingProgress ?? {},
+            normalizedIsCorrect ? "correct" : "wrong",
+          );
+
+          if (existingProgress) {
+            await tx.userWordProgress.update({
+              where: {
+                userId_wordId: {
+                  userId,
+                  wordId,
+                },
+              },
+              data: progressData,
+            });
+          } else {
+            await tx.userWordProgress.create({
+              data: {
+                userId,
+                wordId,
+                ...progressData,
+              },
+            });
+          }
+        }
       }
-    }
+
+      return [createdRecord];
+    });
 
     return NextResponse.json({ record });
-  } catch {
-    return NextResponse.json({ error: "提交失败" }, { status: 500 });
+  } catch (error) {
+    return handleApiError(error);
   }
 }

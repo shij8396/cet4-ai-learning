@@ -91,6 +91,10 @@ npm run build
 npm run test:e2e
 ```
 
+## 部署
+
+本地开发默认使用 SQLite。多人长期使用或公开部署时，建议迁移到 PostgreSQL，并在发布前执行完整检查。详见 [部署说明](./docs/DEPLOYMENT.md)。
+
 ## 数据说明
 
 - `data/cet4-words.json`：完整 CET-4 词库数据。
