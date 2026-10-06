@@ -31,7 +31,7 @@ feat: 添加单词学习进度可视化
 fix: 修复默写评分计算错误
 refactor: 重构 AI 请求缓存层
 docs: 更新 API 文档
-perf: 优化 Prisma 查询性能
+perf: 优化 FastAPI 查询性能
 test: 添加词汇验证器单元测试
 ```
 

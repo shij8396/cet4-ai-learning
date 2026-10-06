@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { PageLoading } from "@/components/shared/LoadingSpinner";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { api } from "@/lib/api-client";
 import { useAudioStore } from "@/stores";
 
 interface WordItem {
@@ -33,9 +34,7 @@ export default function FavoritesPage() {
   const fetchFavorites = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/words/favorites?limit=100");
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
+      const data = await api.get<{ words: WordItem[] }>("/api/v1/words/favorites?limit=100");
       setWords(data.words || []);
     } catch {
       toast.error("加载收藏列表失败");
@@ -50,7 +49,7 @@ export default function FavoritesPage() {
 
   const handleUnfavorite = async (wordId: string) => {
     try {
-      await fetch(`/api/words/${wordId}/favorite`, { method: "POST" });
+      await api.post(`/api/v1/words/${wordId}/favorite`);
       setWords((prev) => prev.filter((w) => w.id !== wordId));
       toast.success("已取消收藏");
     } catch {

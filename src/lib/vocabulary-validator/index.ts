@@ -49,11 +49,4 @@ export {
   isAppropriateForLevel,
   getLevelDescription,
 } from "./readability-analyzer";
-export {
-  loadWordCache,
-  preloadWordCache,
-  refreshWordCache,
-  getCachedWords,
-  getCacheStatus,
-} from "./vocabulary-cache";
 export * from "./types";

@@ -13,7 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -22,8 +22,22 @@ import { staggerChildren, staggerItem } from "@/components/shared/PageTransition
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { api } from "@/lib/api-client";
+import { clearAuthToken, getAuthToken } from "@/lib/auth-token";
+
+const fallbackStats = {
+  user: { masteredWords: 0, totalWords: 0, streak: 0, level: 1, xp: 0 },
+  totals: {
+    wordsLearned: 0,
+    articlesRead: 0,
+    dictations: 0,
+    writingCount: 0,
+    studyMinutes: 0,
+  },
+};
 
 export default function ProfilePage() {
+  const router = useRouter();
   const [stats, setStats] = useState<{
     user: { masteredWords: number; totalWords: number; streak: number; level: number; xp: number };
     totals: {
@@ -33,32 +47,45 @@ export default function ProfilePage() {
       writingCount: number;
       studyMinutes: number;
     };
-  } | null>(null);
+  } | null>(fallbackStats);
 
   const [checkIn, setCheckIn] = useState<{
     checkedInToday: boolean;
     todayStreak: number;
-  } | null>(null);
+  } | null>({ checkedInToday: false, todayStreak: 0 });
 
   useEffect(() => {
-    fetch("/api/analytics?days=1")
-      .then((r) => r.json())
+    if (!getAuthToken()) {
+      return;
+    }
+
+    api
+      .get<typeof fallbackStats>("/api/v1/analytics?days=1")
       .then((d) => {
-        if (!d.error) setStats(d);
+        setStats(d);
       })
       .catch(() => {});
-    fetch("/api/checkin")
-      .then((r) => r.json())
+    api
+      .get<{ checkedInToday: boolean; todayStreak: number }>("/api/v1/checkin")
       .then((d) => {
-        if (!d.error) setCheckIn(d);
+        setCheckIn(d);
       })
       .catch(() => {});
   }, []);
 
+  const handleSignOut = () => {
+    clearAuthToken();
+    router.push("/login");
+  };
+
   const handleCheckIn = async () => {
     try {
-      const res = await fetch("/api/checkin", { method: "POST" });
-      const data = await res.json();
+      const data = await api.post<{
+        checkedIn?: boolean;
+        alreadyCheckedIn?: boolean;
+        streak: number;
+        xpBonus: number;
+      }>("/api/v1/checkin");
       if (data.checkedIn) {
         toast.success(`打卡成功！🔥 连续 ${data.streak} 天`, {
           description: `获得 ${data.xpBonus} XP 奖励`,
@@ -192,7 +219,7 @@ export default function ProfilePage() {
 
           <Card
             className="p-4 hover:bg-muted/30 transition-colors cursor-pointer"
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={handleSignOut}
           >
             <LogOut className="h-5 w-5 text-red-500 mb-2" />
             <p className="text-sm font-medium">退出登录</p>

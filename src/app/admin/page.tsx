@@ -22,6 +22,7 @@ import { useCallback, useEffect, useState } from "react";
 import { staggerChildren, staggerItem } from "@/components/shared/PageTransition";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { api } from "@/lib/api-client";
 import { notification } from "@/lib/notifications";
 
 interface AdminStats {
@@ -54,8 +55,8 @@ export default function AdminDashboard() {
   const loadStats = useCallback(() => {
     setLoading(true);
     Promise.all([
-      fetch("/api/admin/stats").then((r) => r.json()),
-      fetch("/api/ai/debug").then((r) => r.json()),
+      api.get<Omit<AdminStats, "aiCalls">>("/api/v1/admin/stats"),
+      api.get<{ stats?: Record<string, AdminStats["aiCalls"]> }>("/api/v1/ai/debug"),
     ])
       .then(([s, ai]) => {
         const aiStats = ai?.stats?.[Object.keys(ai.stats || {})[0]] || {

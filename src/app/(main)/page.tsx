@@ -14,13 +14,14 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Header } from "@/components/layout/Header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { api } from "@/lib/api-client";
+import { getAuthToken } from "@/lib/auth-token";
 import { useStudyStore } from "@/stores";
 
 import type { TodayDashboard, WeaknessItem } from "@/features/study/services/studyDashboard";
@@ -112,49 +113,44 @@ const itemVariants = {
 };
 
 export default function HomePage() {
-  const { data: session, status } = useSession();
   const router = useRouter();
   const { todayWordsLearned, todayWordsReviewed, todayStudyMinutes } = useStudyStore();
   const [dashboard, setDashboard] = useState<TodayDashboard>(fallbackDashboard);
   const [weaknessItems, setWeaknessItems] = useState<WeaknessItem[]>([]);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [currentUser, setCurrentUser] = useState<{ name?: string | null } | null>(null);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
+    const token = getAuthToken();
+    if (!token) {
       router.push("/login");
+      return;
     }
-  }, [status, router]);
-
-  useEffect(() => {
-    if (status !== "authenticated") return;
 
     let cancelled = false;
-
-    async function loadDashboard() {
-      const [todayResponse, weaknessResponse] = await Promise.all([
-        fetch("/api/dashboard/today"),
-        fetch("/api/weakness"),
-      ]);
-
-      if (cancelled) return;
-
-      if (todayResponse.ok) {
-        setDashboard(await todayResponse.json());
-      }
-
-      if (weaknessResponse.ok) {
-        const data = (await weaknessResponse.json()) as { items?: WeaknessItem[] };
-        setWeaknessItems(data.items ?? []);
-      }
-    }
-
-    loadDashboard().catch(() => {
-      if (!cancelled) setDashboard(fallbackDashboard);
-    });
+    Promise.all([
+      api.get<{ name?: string | null }>("/api/v1/auth/me"),
+      api.get<TodayDashboard>("/api/v1/dashboard/today"),
+      api.get<{ items?: WeaknessItem[] }>("/api/v1/weakness"),
+    ])
+      .then(([user, todayDashboard, weakness]) => {
+        if (!cancelled) {
+          setCurrentUser(user);
+          setDashboard(todayDashboard);
+          setWeaknessItems(weakness.items ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) router.push("/login");
+      })
+      .finally(() => {
+        if (!cancelled) setAuthChecked(true);
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [status]);
+  }, [router]);
 
   const summary = useMemo(() => {
     const serverSummary = dashboard.summary;
@@ -166,7 +162,7 @@ export default function HomePage() {
     };
   }, [dashboard.summary, todayStudyMinutes, todayWordsLearned, todayWordsReviewed]);
 
-  if (status === "loading" || !session) {
+  if (!authChecked || !currentUser) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -189,7 +185,7 @@ export default function HomePage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-sm text-muted-foreground">
-                    {session.user?.name || "同学"}，今天继续推进四级闭环
+                    {currentUser.name || "同学"}，今天继续推进四级闭环
                   </p>
                   <h2 className="mt-1 text-2xl font-bold">
                     {summary.completedTasks}/{summary.totalTasks} 项已完成

@@ -2,7 +2,7 @@
 
 import { BookOpen, Check, SkipForward, Trophy, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { Header } from "@/components/layout/Header";
@@ -11,15 +11,47 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { PageLoading } from "@/components/shared/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { api } from "@/lib/api-client";
 import { useAudioStore, useStudyStore } from "@/stores";
 import { selectCurrentWord, selectProgress, useLearnStore } from "@/stores/learnStore";
-import { useWordCacheStore } from "@/stores/wordCacheStore";
+import { useWordCacheStore, type WordWithProgress } from "@/stores/wordCacheStore";
+
+const SESSION_SIZE_OPTIONS = [10, 20, 30, 50, 100];
+const DEFAULT_SESSION_SIZE = 30;
+
+function toLearnWord(word: WordWithProgress) {
+  return {
+    id: word.id,
+    word: word.word,
+    phonetic: word.phonetic ?? null,
+    meaning: word.meaning,
+    partOfSpeech: word.partOfSpeech ?? null,
+    example: word.example ?? null,
+    exampleCn: word.exampleCn ?? null,
+    tags: word.tags ?? [],
+  };
+}
+
+function rankWordsForLearning(words: WordWithProgress[]) {
+  return [...words].sort((a, b) => {
+    const masteryA = a.progress?.masteryLevel ?? 0;
+    const masteryB = b.progress?.masteryLevel ?? 0;
+    if (masteryA !== masteryB) return masteryA - masteryB;
+
+    const reviewsA = a.progress?.reviewCount ?? 0;
+    const reviewsB = b.progress?.reviewCount ?? 0;
+    if (reviewsA !== reviewsB) return reviewsA - reviewsB;
+
+    return b.frequency - a.frequency;
+  });
+}
 
 export default function LearnPage() {
   const router = useRouter();
   const { words: allWords, loading, fetchWords } = useWordCacheStore();
   const { play } = useAudioStore();
   const { incrementReviewed } = useStudyStore();
+  const [sessionSize, setSessionSize] = useState(DEFAULT_SESSION_SIZE);
 
   const queue = useLearnStore((state) => state.queue);
   const currentIndex = useLearnStore((state) => state.currentIndex);
@@ -34,28 +66,34 @@ export default function LearnPage() {
 
   const currentWord = useLearnStore(selectCurrentWord);
   const progress = useLearnStore(selectProgress);
+  const rankedWords = useMemo(() => rankWordsForLearning(allWords), [allWords]);
+
+  const createSession = useCallback(
+    (size = sessionSize) => {
+      const nextQueue = rankedWords.slice(0, size).map(toLearnWord);
+      setQueue(nextQueue);
+      if (nextQueue.length > 0) startSession();
+    },
+    [rankedWords, sessionSize, setQueue, startSession],
+  );
 
   useEffect(() => {
     fetchWords();
   }, [fetchWords]);
 
   useEffect(() => {
-    if (!loading && allWords.length > 0 && queue.length === 0) {
-      setQueue(
-        allWords.slice(0, 30).map((word) => ({
-          id: word.id,
-          word: word.word,
-          phonetic: word.phonetic ?? null,
-          meaning: word.meaning,
-          partOfSpeech: word.partOfSpeech ?? null,
-          example: word.example ?? null,
-          exampleCn: word.exampleCn ?? null,
-          tags: word.tags ?? [],
-        })),
-      );
-      startSession();
+    if (!loading && rankedWords.length > 0 && queue.length === 0) {
+      createSession();
     }
-  }, [allWords, loading, queue.length, setQueue, startSession]);
+  }, [createSession, loading, queue.length, rankedWords.length]);
+
+  const handleSessionSizeChange = useCallback(
+    (size: number) => {
+      setSessionSize(size);
+      createSession(size);
+    },
+    [createSession],
+  );
 
   const handleReview = useCallback(
     async (result: "correct" | "wrong" | "skip") => {
@@ -63,18 +101,16 @@ export default function LearnPage() {
       const word = state.queue[state.currentIndex];
       if (!word) return;
 
-      try {
-        await fetch(`/api/words/${word.id}/review`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+      if (word.id !== word.word) {
+        try {
+          await api.post(`/api/v1/words/${word.id}/review`, {
             result,
             reviewType: "recognition",
-          }),
-        });
-        incrementReviewed();
-      } catch {
-        console.error("Review record failed");
+          });
+          incrementReviewed();
+        } catch {
+          console.error("Review record failed");
+        }
       }
 
       if (result === "correct") markCorrect(word.id);
@@ -87,9 +123,13 @@ export default function LearnPage() {
   const handleToggleFavorite = useCallback(async () => {
     const word = useLearnStore.getState().queue[useLearnStore.getState().currentIndex];
     if (!word) return;
+    if (word.id === word.word) {
+      toast.info("本地词库模式暂不保存收藏");
+      return;
+    }
 
     try {
-      await fetch(`/api/words/${word.id}/favorite`, { method: "POST" });
+      await api.post(`/api/v1/words/${word.id}/favorite`);
       toast.success("已切换收藏状态");
     } catch {
       toast.error("操作失败");
@@ -155,8 +195,7 @@ export default function LearnPage() {
               </Button>
               <Button
                 onClick={() => {
-                  resetSession();
-                  startSession();
+                  createSession();
                 }}
               >
                 再来一轮
@@ -173,13 +212,41 @@ export default function LearnPage() {
       <Header title="单词学习" />
       <div className="mx-auto flex min-h-[calc(100vh-12rem)] max-w-lg flex-col p-4">
         <div className="mb-4 space-y-1">
-          <div className="flex justify-between text-sm text-muted-foreground">
+          <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
             <span>
               {currentIndex + 1} / {queue.length}
             </span>
-            <span>{Math.round(progress)}%</span>
+            <div className="flex items-center gap-2">
+              <span>{Math.round(progress)}%</span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 rounded-md px-2 text-xs"
+                onClick={() => {
+                  resetSession();
+                  createSession();
+                }}
+              >
+                换一轮
+              </Button>
+            </div>
           </div>
           <Progress value={progress} className="h-1.5" />
+          <div className="flex flex-wrap items-center gap-2 pt-2 text-xs text-muted-foreground">
+            <span className="shrink-0">本轮数量</span>
+            {SESSION_SIZE_OPTIONS.map((size) => (
+              <Button
+                key={size}
+                type="button"
+                variant={sessionSize === size ? "default" : "outline"}
+                size="sm"
+                className="h-7 rounded-md px-2 text-xs"
+                onClick={() => handleSessionSizeChange(size)}
+              >
+                {size}
+              </Button>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-1 items-center justify-center">

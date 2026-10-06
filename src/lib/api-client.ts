@@ -1,3 +1,4 @@
+import { getAuthToken } from "./auth-token";
 import {
   AIServiceError,
   AppError,
@@ -19,6 +20,13 @@ export interface FetchOptions extends Omit<RequestInit, "body"> {
 const DEFAULT_TIMEOUT = 30000;
 const DEFAULT_RETRIES = 1;
 const DEFAULT_RETRY_DELAY = 1000;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
+
+export function resolveAPIUrl(url: string): string {
+  if (/^https?:\/\//.test(url)) return url;
+  if (API_BASE_URL && url.startsWith("/api/v1")) return `${API_BASE_URL}${url}`;
+  return url;
+}
 
 function parseAPIError(data: unknown, status: number): AppError {
   if (typeof data === "object" && data !== null && "code" in data) {
@@ -45,16 +53,18 @@ function parseAPIError(data: unknown, status: number): AppError {
 
 async function fetchWithTimeout(url: string, options: FetchOptions): Promise<Response> {
   const { timeout = DEFAULT_TIMEOUT, ...fetchOptions } = options;
+  const token = getAuthToken();
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(resolveAPIUrl(url), {
       ...fetchOptions,
       signal: controller.signal,
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...fetchOptions.headers,
       },
       body: fetchOptions.body ? JSON.stringify(fetchOptions.body) : undefined,

@@ -12,6 +12,7 @@ import { PageLoading } from "@/components/shared/LoadingSpinner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { api } from "@/lib/api-client";
 import { useAudioStore } from "@/stores";
 
 interface WrongWordItem {
@@ -36,9 +37,7 @@ export default function WrongWordsPage() {
   const fetchWrongWords = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/words/wrong?limit=100");
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
+      const data = await api.get<{ words: WrongWordItem[] }>("/api/v1/words/wrong?limit=100");
       setWords(data.words || []);
     } catch {
       toast.error("加载错词列表失败");

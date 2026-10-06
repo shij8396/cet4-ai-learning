@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { api } from "@/lib/api-client";
 
 import type { WeaknessItem } from "@/features/study/services/studyDashboard";
 
@@ -20,11 +21,8 @@ export default function WeaknessPage() {
   async function loadItems() {
     setLoading(true);
     try {
-      const response = await fetch("/api/weakness");
-      if (response.ok) {
-        const data = (await response.json()) as { items?: WeaknessItem[] };
-        setItems(data.items ?? []);
-      }
+      const data = await api.get<{ items?: WeaknessItem[] }>("/api/v1/weakness");
+      setItems(data.items ?? []);
     } finally {
       setLoading(false);
     }
@@ -37,9 +35,7 @@ export default function WeaknessPage() {
   async function resolveItem(item: WeaknessItem) {
     setResolvingId(item.id);
     try {
-      await fetch(`/api/weakness/${item.type}/${encodeURIComponent(item.refId)}/resolve`, {
-        method: "POST",
-      });
+      await api.post(`/api/v1/weakness/${item.type}/${encodeURIComponent(item.refId)}/resolve`);
       setItems((current) => current.filter((candidate) => candidate.id !== item.id));
     } finally {
       setResolvingId(null);

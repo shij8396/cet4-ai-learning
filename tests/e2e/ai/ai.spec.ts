@@ -52,7 +52,7 @@ test.describe("AI系统测试", () => {
   test.describe("AI响应时间", () => {
     test("AI相关API端点可访问且响应合理", async ({ page }) => {
       const start = Date.now();
-      const response = await page.request.get("/api/ai/debug");
+      const response = await page.request.get("/api/v1/ai/debug");
       const elapsed = Date.now() - start;
 
       expect(response.status()).toBeGreaterThanOrEqual(200);
@@ -73,7 +73,7 @@ test.describe("AI系统测试", () => {
 
   test.describe("AI输出审核", () => {
     test("阅读API返回合法数据", async ({ page }) => {
-      const response = await page.request.get("/api/reading");
+      const response = await page.request.get("/api/v1/reading");
       expect(response.ok()).toBeTruthy();
 
       const data = await response.json();

@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -21,6 +20,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { api } from "@/lib/api-client";
+import { setAuthToken } from "@/lib/auth-token";
 
 const registerSchema = z
   .object({
@@ -51,21 +52,19 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterForm) => {
     setLoading(true);
     try {
-      const result = await signIn("credentials", {
+      await api.post("/api/v1/auth/register", {
         email: data.email,
         password: data.password,
         name: data.name,
-        isRegistering: "true",
-        redirect: false,
       });
-
-      if (result?.error) {
-        toast.error(result.error);
-      } else {
-        toast.success("注册成功，欢迎加入");
-        router.push("/");
-        router.refresh();
-      }
+      const result = await api.post<{ accessToken: string }>("/api/v1/auth/login", {
+        email: data.email,
+        password: data.password,
+      });
+      setAuthToken(result.accessToken);
+      toast.success("注册成功，欢迎加入");
+      router.push("/");
+      router.refresh();
     } catch {
       toast.error("注册失败，请稍后重试");
     } finally {

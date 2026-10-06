@@ -178,7 +178,7 @@ export default function SettingsPage() {
             <div className="text-xs text-muted-foreground space-y-1">
               <p>AI英语四级学习 v1.0.0</p>
               <p>基于词汇约束的AI英语学习系统</p>
-              <p>Build with Next.js + Prisma + TypeScript</p>
+              <p>Build with Next.js + FastAPI + TypeScript</p>
             </div>
           </Card>
         </motion.div>

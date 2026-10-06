@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, LogIn } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -21,6 +20,8 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { api } from "@/lib/api-client";
+import { setAuthToken } from "@/lib/auth-token";
 
 const loginSchema = z.object({
   email: z.string().email("请输入有效的邮箱地址"),
@@ -44,19 +45,11 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setLoading(true);
     try {
-      const result = await signIn("credentials", {
-        email: data.email,
-        password: data.password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        toast.error(result.error);
-      } else {
-        toast.success("登录成功");
-        router.push("/");
-        router.refresh();
-      }
+      const result = await api.post<{ accessToken: string }>("/api/v1/auth/login", data);
+      setAuthToken(result.accessToken);
+      toast.success("登录成功");
+      router.push("/");
+      router.refresh();
     } catch {
       toast.error("登录失败，请稍后重试");
     } finally {

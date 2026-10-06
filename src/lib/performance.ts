@@ -105,6 +105,6 @@ export function reportWebVitals(metric: {
   }
 
   if (navigator.sendBeacon) {
-    navigator.sendBeacon("/api/analytics/vitals", JSON.stringify(body));
+    navigator.sendBeacon("/api/v1/analytics/vitals", JSON.stringify(body));
   }
 }

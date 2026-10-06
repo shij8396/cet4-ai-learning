@@ -1,3 +1,5 @@
+import { api } from "@/lib/api-client";
+
 import type { ValidationResult, ContentValidationReport, SpellCheckResult } from "@/types";
 
 const CET4_WORD_SET = new Set<string>();
@@ -14,8 +16,7 @@ export async function initializeWordSet(words?: string[]): Promise<void> {
   }
 
   try {
-    const response = await fetch("/api/words/list");
-    const data = await response.json();
+    const data = await api.get<{ words?: { word: string }[] }>("/api/v1/words/list");
     if (data.words) {
       data.words.forEach((w: { word: string }) => CET4_WORD_SET.add(w.word.toLowerCase()));
     }

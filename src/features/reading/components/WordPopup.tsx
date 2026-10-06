@@ -7,7 +7,10 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cet4Words } from "@/data/cet4Words";
+import { api } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
+import { getLookupForms } from "@/lib/vocabulary-validator/lemma-normalizer";
 import { pronunciationService } from "@/services/audio/pronunciationService";
 
 interface WordPopupProps {
@@ -30,6 +33,15 @@ interface WordInfo {
   isInCET4: boolean;
   suggestions: string[];
   lemma: string;
+}
+
+interface WordRecord {
+  word: string;
+  phonetic: string | null;
+  meaning: string;
+  example: string | null;
+  exampleCn: string | null;
+  partOfSpeech: string | null;
 }
 
 const BARS = [0.4, 0.7, 1, 0.6, 0.85, 0.5];
@@ -108,18 +120,72 @@ function formatPhonetic(phonetic: string | null) {
 }
 
 async function fetchWordInfo(word: string, signal: AbortSignal): Promise<WordInfo> {
-  const response = await fetch("/api/vocabulary/validate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text: word, checkLemmas: true }),
-    signal,
-  });
+  const lookupForms = getLookupForms(word);
+  const fallbackRecord = lookupForms
+    .map((form) => cet4Words.find((item) => item.word.toLowerCase() === form))
+    .find(Boolean);
 
-  if (!response.ok) {
-    throw new Error(`Lookup failed: ${response.status}`);
+  if (fallbackRecord) {
+    return {
+      word,
+      phonetic: fallbackRecord.phonetic || null,
+      meaning: fallbackRecord.meaning || "",
+      example: fallbackRecord.example || null,
+      exampleCn: null,
+      partOfSpeech: fallbackRecord.partOfSpeech || null,
+      isInCET4: true,
+      suggestions: [],
+      lemma: fallbackRecord.word,
+    };
   }
 
-  const data = await response.json();
+  for (const form of lookupForms) {
+    const query = new URLSearchParams({
+      q: form,
+      limit: "10",
+      sortBy: "frequency",
+      sortOrder: "desc",
+    });
+    const data = await api.get<{ words?: WordRecord[] }>(`/api/v1/words?${query.toString()}`, {
+      signal,
+    });
+    const record =
+      data.words?.find((item) => item.word.toLowerCase() === form) ??
+      data.words?.find((item) => item.word.toLowerCase() === word.toLowerCase());
+
+    if (record) {
+      return {
+        word,
+        phonetic: record.phonetic || null,
+        meaning: record.meaning || "",
+        example: record.example || null,
+        exampleCn: record.exampleCn || null,
+        partOfSpeech: record.partOfSpeech || null,
+        isInCET4: true,
+        suggestions: [],
+        lemma: record.word,
+      };
+    }
+  }
+
+  const data = await api.post<{
+    phonetic?: string;
+    meaning?: string;
+    example?: string;
+    exampleCn?: string;
+    partOfSpeech?: string;
+    isInWordList?: boolean;
+    isInCET4?: boolean;
+    valid?: boolean;
+    suggestions?: string[];
+    lemma?: string;
+  }>(
+    "/api/v1/vocabulary/validate",
+    { text: word, checkLemmas: true },
+    {
+      signal,
+    },
+  );
   return {
     word,
     phonetic: data.phonetic || null,
@@ -128,7 +194,7 @@ async function fetchWordInfo(word: string, signal: AbortSignal): Promise<WordInf
     exampleCn: data.exampleCn || null,
     partOfSpeech: data.partOfSpeech || null,
     isInCET4: data.isInCET4 ?? data.valid ?? false,
-    suggestions: data.suggestions?.[0]?.suggestions || [],
+    suggestions: data.suggestions || [],
     lemma: data.lemma || word,
   };
 }

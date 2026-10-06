@@ -3,18 +3,8 @@ import { join } from "path";
 
 import { describe, expect, it } from "vitest";
 
-const ROOTS = ["README.md", "docs", "src", "tests", "prisma", "scripts"];
-const TEXT_EXTENSIONS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".mjs",
-  ".md",
-  ".json",
-  ".prisma",
-  ".yml",
-  ".yaml",
-]);
+const ROOTS = ["README.md", "docs", "src", "tests", "scripts"];
+const TEXT_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".mjs", ".md", ".json", ".yml", ".yaml"]);
 const IGNORED_PARTS = new Set([
   "generated",
   "node_modules",

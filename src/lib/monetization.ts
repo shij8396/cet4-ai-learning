@@ -145,17 +145,17 @@ export function isFeatureEnabled(featureKey: string, userTier: SubscriptionTier)
 
 const EXPANSION_HOOKS = {
   payment: {
-    endpoint: "/api/payment",
+    endpoint: "/api/v1/payment",
     providers: ["wechat", "alipay", "stripe"],
     implemented: false,
   },
   subscription: {
-    endpoint: "/api/subscription",
+    endpoint: "/api/v1/subscription",
     plans: ["monthly", "yearly", "lifetime"],
     implemented: false,
   },
   referral: {
-    endpoint: "/api/referral",
+    endpoint: "/api/v1/referral",
     reward: "7_days_premium",
     implemented: false,
   },

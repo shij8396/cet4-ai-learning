@@ -1,7 +1,6 @@
 import { batchCheckLevel } from "@/lib/vocabulary-validator/level-checker";
 import { batchSpellCheck } from "@/lib/vocabulary-validator/spell-checker";
 import { tokenize } from "@/lib/vocabulary-validator/tokenizer";
-import { loadWordCache, getCacheStatus } from "@/lib/vocabulary-validator/vocabulary-cache";
 import { batchIsInCET4 } from "@/lib/vocabulary-validator/vocabulary-checker";
 
 import type { ValidationReport } from "../types";
@@ -25,11 +24,6 @@ export async function validateAIContent(
 
   let currentText = text;
   let retryCount = 0;
-
-  const cacheStatus = getCacheStatus();
-  if (!cacheStatus.isLoaded) {
-    await loadWordCache();
-  }
 
   while (retryCount <= maxRetries) {
     const tokens = tokenize(currentText);

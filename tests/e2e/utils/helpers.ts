@@ -1,10 +1,48 @@
-import { type Page, expect } from "@playwright/test";
+import { type Locator, type Page, expect } from "@playwright/test";
 
 export async function loginAs(page: Page, email: string, password: string) {
   await page.goto("/login");
   await page.getByTestId("login-email").fill(email);
   await page.getByTestId("login-password").fill(password);
   await page.getByTestId("login-submit").click();
+}
+
+export async function loginWithFastApi(page: Page) {
+  await page.goto("/login");
+  await page.evaluate(() => window.localStorage.clear());
+  await page.getByTestId("login-email").fill("test@cet4.com");
+  await page.getByTestId("login-password").fill("test123456");
+  await page.getByTestId("login-submit").click();
+  await page.waitForURL((url) => url.pathname === "/", { timeout: 15000 });
+  await expect
+    .poll(async () => page.evaluate(() => window.localStorage.getItem("cet4_access_token")))
+    .toBeTruthy();
+}
+
+export async function expectNoAppError(page: Page) {
+  await expect(
+    page.getByText(/Application error|Unhandled Runtime Error|Build Error/i),
+  ).toHaveCount(0);
+}
+
+export async function expectPageUsable(page: Page, route: string) {
+  await page.waitForLoadState("domcontentloaded");
+  await expect(page).toHaveURL(new RegExp(`${route.replace(/\//g, "\\/")}(?:$|[?#])`));
+  await expect(page.locator("body")).toContainText(/\S/, { timeout: 15000 });
+  await expectNoAppError(page);
+}
+
+export async function safeClickIfVisible(locator: Locator): Promise<boolean> {
+  if (
+    await locator
+      .first()
+      .isVisible()
+      .catch(() => false)
+  ) {
+    await locator.first().click();
+    return true;
+  }
+  return false;
 }
 
 export async function registerAs(

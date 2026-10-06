@@ -1,6 +1,10 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
 /node_modules
 /.pnp
 .pnp.*
@@ -42,8 +46,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/src/generated/prisma
-
 # generated PWA assets
 /public/sw.js
 /public/workbox-*.js
@@ -66,4 +68,6 @@ next-env.d.ts
 *.sqlite
 *.sqlite-journal
 dev-server*.log
+*.local.out.log
+*.local.err.log
 doctor-report.md

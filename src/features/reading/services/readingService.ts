@@ -1,3 +1,5 @@
+import { api } from "@/lib/api-client";
+
 import type { ReadingArticleType, UserReadingProgressType } from "@/types";
 
 export type ArticleListResponse = {
@@ -21,15 +23,11 @@ export async function fetchArticles(params?: {
   if (params?.level) searchParams.set("level", String(params.level));
   if (params?.tag) searchParams.set("tag", params.tag);
 
-  const res = await fetch(`/api/reading?${searchParams.toString()}`);
-  if (!res.ok) throw new Error("Failed to fetch articles");
-  return res.json();
+  return api.get<ArticleListResponse>(`/api/v1/reading?${searchParams.toString()}`);
 }
 
 export async function fetchArticleDetail(id: string): Promise<ArticleDetailResponse> {
-  const res = await fetch(`/api/reading/${id}`);
-  if (!res.ok) throw new Error("Failed to fetch article");
-  return res.json();
+  return api.get<ArticleDetailResponse>(`/api/v1/reading/${id}`);
 }
 
 export async function saveReadingProgress(
@@ -42,12 +40,7 @@ export async function saveReadingProgress(
     isCompleted?: boolean;
   },
 ): Promise<void> {
-  const res = await fetch(`/api/reading/${articleId}/progress`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error("Failed to save progress");
+  await api.post(`/api/v1/reading/${articleId}/progress`, data);
 }
 
 export async function fetchRecommendedArticles(params?: {
@@ -57,9 +50,7 @@ export async function fetchRecommendedArticles(params?: {
   if (params?.level) searchParams.set("level", String(params.level));
   searchParams.set("recommended", "true");
 
-  const res = await fetch(`/api/reading?${searchParams.toString()}`);
-  if (!res.ok) throw new Error("Failed to fetch recommendations");
-  const data = await res.json();
+  const data = await api.get<ArticleListResponse>(`/api/v1/reading?${searchParams.toString()}`);
   return data.articles;
 }
 

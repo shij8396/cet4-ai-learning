@@ -9,6 +9,7 @@ import { staggerChildren, staggerItem } from "@/components/shared/PageTransition
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { api } from "@/lib/api-client";
 
 import type { AchievementDef } from "@/features/achievements/achievementDefs";
 
@@ -28,10 +29,15 @@ export default function AchievementsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/achievements")
-      .then((r) => r.json())
+    api
+      .get<{
+        achievements: AchievementWithProgress[];
+        unlockedCount: number;
+        totalCount: number;
+        completionRate: number;
+      }>("/api/v1/achievements")
       .then((d) => {
-        if (!d.error) setData(d);
+        setData(d);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

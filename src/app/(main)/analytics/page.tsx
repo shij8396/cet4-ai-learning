@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 
 import { Header } from "@/components/layout/Header";
 import { staggerChildren, staggerItem } from "@/components/shared/PageTransition";
+import { api } from "@/lib/api-client";
 
 interface AnalyticsData {
   today: {
@@ -65,10 +66,10 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/analytics?days=90")
-      .then((r) => r.json())
+    api
+      .get<AnalyticsData>("/api/v1/analytics?days=90")
       .then((d) => {
-        if (!d.error) setData(d);
+        setData(d);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

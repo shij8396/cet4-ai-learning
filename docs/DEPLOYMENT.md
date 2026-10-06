@@ -1,65 +1,58 @@
 # Deployment Notes
 
-This project is PostgreSQL-first. SQLite is no longer the enterprise default path.
+The app now uses a split deployment model:
 
-## Local Development
+- Next.js frontend serves the web application.
+- FastAPI backend owns authentication, data access, and `/api/v1/*`.
+- MySQL stores application data.
+- Redis is available for token blacklist and cache-related backend hooks.
 
-```bash
-cp .env.example .env.local
-npm install
-docker compose up -d db
-npm run db:deploy
-npx tsx prisma/seed.ts
-npm run dev
-```
+## Frontend
 
-Recommended local values:
+Required variables:
 
 ```env
-DATABASE_URL="postgresql://postgres:password@localhost:5432/cet4_learning"
-AUTH_SECRET="replace-with-a-long-random-secret"
-AUTH_URL="http://localhost:3000"
-ADMIN_USER_IDS=""
+NEXT_PUBLIC_API_BASE_URL="https://api.example.com"
+NEXT_PUBLIC_APP_URL="https://app.example.com"
 ```
 
-## Production Checklist
-
-- Use a managed PostgreSQL database.
-- Set a long random `AUTH_SECRET`.
-- Configure `AUTH_URL` to the public application origin.
-- Keep AI provider keys optional; the core study flow must still run when AI calls fail.
-- Run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build`.
-- Run `npm run db:deploy` before starting the application.
-- Do not upload `.env*`, Playwright auth state, build outputs, logs, or database dumps.
-
-## Database Migration
-
-For a fresh PostgreSQL database:
+Build command:
 
 ```bash
-npm run db:deploy
-npx tsx prisma/seed.ts
+npm run build
 ```
 
-For schema changes:
+## Backend
+
+Required variables:
+
+```env
+DATABASE_URL="mysql+pymysql://USER:PASSWORD@HOST:3306/DATABASE"
+REDIS_URL="redis://HOST:6379/0"
+JWT_SECRET_KEY="replace-with-a-long-random-secret"
+CORS_ORIGINS="https://app.example.com"
+```
+
+Install and run:
 
 ```bash
-npx prisma migrate dev --name <change_name>
-npm run db:generate
+pip install -r backend/requirements.txt
+cd backend
+alembic upgrade head
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+## Checks
+
+Run before release:
+
+```bash
+npm run lint
+npm run typecheck
 npm test
+npm run build
+cd backend
+python -m pytest
 ```
 
-The seed script imports the CET-4 word list from `data/cet4-words.json` and creates a local test account.
-
-## Health Checks
-
-- `GET /api/health`: process liveness.
-- `GET /api/ready`: database connectivity, CET-4 word count, and AI provider configuration.
-
-Use `/api/ready` as the stronger deployment readiness probe.
-
-## GitHub Actions
-
-The repository includes a CI workflow for format, lint, typecheck, unit tests, production build, PostgreSQL migration/seed, and Playwright smoke tests.
-
-Publishing workflow files requires a GitHub token with the `workflow` scope. If your token lacks that scope, run the same commands locally before pushing code.
+Use `/health` for liveness and `/ready` for readiness.

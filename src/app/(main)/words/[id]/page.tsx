@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { api } from "@/lib/api-client";
 import { useAudioStore, useStudyStore } from "@/stores";
 
 interface WordDetail {
@@ -57,9 +58,7 @@ export default function WordDetailPage() {
 
   const fetchWord = useCallback(async () => {
     try {
-      const response = await fetch(`/api/words/${params.id}`);
-      if (!response.ok) throw new Error("Word not found");
-      setWord(await response.json());
+      setWord(await api.get<WordDetail>(`/api/v1/words/${params.id}`));
     } catch {
       toast.error("无法加载单词信息");
     } finally {
@@ -74,8 +73,9 @@ export default function WordDetailPage() {
   const handleToggleFavorite = useCallback(async () => {
     if (!word) return;
     try {
-      const response = await fetch(`/api/words/${word.id}/favorite`, { method: "POST" });
-      const data = await response.json();
+      const data = await api.post<{ isFavorite: boolean; progress: WordDetail["progress"] }>(
+        `/api/v1/words/${word.id}/favorite`,
+      );
       setWord((previous) => (previous ? { ...previous, progress: data.progress } : previous));
       toast.success(data.isFavorite ? "已收藏" : "已取消收藏");
     } catch {
@@ -87,12 +87,10 @@ export default function WordDetailPage() {
     async (result: "correct" | "wrong" | "skip") => {
       if (!word) return;
       try {
-        const response = await fetch(`/api/words/${word.id}/review`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ result, reviewType: "recognition" }),
-        });
-        const data = await response.json();
+        const data = await api.post<{ progress: WordDetail["progress"] }>(
+          `/api/v1/words/${word.id}/review`,
+          { result, reviewType: "recognition" },
+        );
         setWord((previous) => (previous ? { ...previous, progress: data.progress } : previous));
         incrementReviewed();
         toast.success(

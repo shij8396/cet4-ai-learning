@@ -22,6 +22,11 @@ import {
   useWritingStore,
   WritingEditor,
 } from "@/features/writing";
+import {
+  deleteWritingRecord,
+  getWritingHistory,
+  saveWritingRecord,
+} from "@/features/writing/services/writingService";
 
 import type { HistoryRecord } from "@/features/writing/types";
 
@@ -79,6 +84,7 @@ export default function WritingPage() {
     setShowScore,
     setShowHistory,
     removeDraft,
+    setHistory,
     reset,
   } = useWritingStore();
 
@@ -125,12 +131,47 @@ export default function WritingPage() {
     [setContent, setShowHistory, setTitle],
   );
 
-  const handleSaveNow = useCallback(() => {
+  const handleSaveNow = useCallback(async () => {
     save();
+    if (content.trim()) {
+      await saveWritingRecord({
+        title: title.trim() || undefined,
+        content,
+        score: score?.overallScore,
+        spellingErrors: lastAnalysis?.spellingErrors,
+        outOfLevelWords: lastAnalysis?.outOfLevelWords.map((item) => item.word),
+        vocabularyCoverage: lastAnalysis?.vocabularyCoverage,
+      });
+      setHistory(await getWritingHistory());
+    }
     setNow(Date.now());
     setSavedToast(true);
     window.setTimeout(() => setSavedToast(false), 2000);
-  }, [save]);
+  }, [content, lastAnalysis, save, score, setHistory, title]);
+
+  const handleToggleHistory = useCallback(async () => {
+    const next = !showHistory;
+    setShowHistory(next);
+    if (next) {
+      try {
+        setHistory(await getWritingHistory());
+      } catch {
+        // Local drafts remain available when the API is offline.
+      }
+    }
+  }, [setHistory, setShowHistory, showHistory]);
+
+  const handleDeleteHistory = useCallback(
+    async (id: string) => {
+      try {
+        await deleteWritingRecord(id);
+        setHistory(await getWritingHistory());
+      } catch {
+        removeDraft(id);
+      }
+    },
+    [removeDraft, setHistory],
+  );
 
   const handleClear = useCallback(() => {
     if (content && !window.confirm("确定清空当前作文吗？草稿会被保留。")) return;
@@ -237,7 +278,7 @@ export default function WritingPage() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => setShowHistory(!showHistory)}
+            onClick={handleToggleHistory}
             className={
               showHistory ? "bg-blue-50 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400" : ""
             }
@@ -299,7 +340,7 @@ export default function WritingPage() {
           <WritingHistory
             records={history}
             onSelect={handleSelectHistory}
-            onDelete={(id) => removeDraft(id)}
+            onDelete={handleDeleteHistory}
             onClose={() => setShowHistory(false)}
           />
         )}
